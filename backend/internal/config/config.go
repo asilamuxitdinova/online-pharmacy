@@ -62,7 +62,7 @@ func Load() (Config, error) {
 		OAuthClientSecret: env("OAUTH_CLIENT_SECRET", "dev-only-oauth-secret"),
 		OAuthRedirectURIs: envList("OAUTH_REDIRECT_URIS"),
 
-		PartnerClientID: env("PARTNER_CLIENT_ID", "partner-demo"),
+		PartnerClientID: env("PARTNER_CLIENT_ID", "wholesale-partner"),
 		PartnerSecret:   env("PARTNER_SECRET", "dev-only-partner-secret"),
 
 		WebhookSecret: env("WEBHOOK_SECRET", "dev-only-webhook-secret"),

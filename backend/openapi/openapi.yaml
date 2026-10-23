@@ -1514,7 +1514,7 @@ components:
       name: X-Client-Id
       in: header
       required: true
-      schema: {type: string, example: partner-demo}
+      schema: {type: string, example: wholesale-partner}
     PartnerTimestamp:
       name: X-Timestamp
       in: header
