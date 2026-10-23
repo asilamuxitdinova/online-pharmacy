@@ -33,8 +33,4 @@ pharmacy.sukoon.uz {
 		try_files {path} /index.html
 		file_server
 	}
-
-	log {
-		output file /var/log/caddy/pharmacy.sukoon.uz.log
-	}
 }
