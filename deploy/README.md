@@ -3,10 +3,10 @@
 `pharmacy.sukoon.uz` runs on the server that already serves `sukoon.uz` behind Caddy.
 
 ```
-browser / Frege ──https──▶ Caddy ─┬─ /api/*            ─▶ 127.0.0.1:8080 (prefix stripped)
+browser / Frege ──https──▶ Caddy ─┬─ /api/*            ─▶ 127.0.0.1:8090 (prefix stripped)
                                   ├─ /oauth/authorize,
                                   │  /oauth/token,
-                                  │  /docs, /openapi.yaml ─▶ 127.0.0.1:8080
+                                  │  /docs, /openapi.yaml ─▶ 127.0.0.1:8090
                                   └─ everything else     ─▶ /opt/frege-pharmacy/current/web
 ```
 
@@ -32,7 +32,7 @@ Create an environment named **production** (Settings → Environments). Optional
 | secret | `DEPLOY_SSH_KEY` | private key of a key pair made only for this |
 | secret | `DEPLOY_KNOWN_HOSTS` | output of `ssh-keyscan -p <port> <host>`, checked against the server |
 | variable | `DEPLOY_PORT` | SSH port, if not 22 |
-| variable | `HEALTH_URL` | if `ADDR` is not `127.0.0.1:8080`: `http://127.0.0.1:<port>/health` |
+| variable | `HEALTH_URL` | if `ADDR` is not `127.0.0.1:8090`: `http://127.0.0.1:<port>/health` |
 
 Repository variable (optional): `VITE_OAUTH_CLIENT_SECRET`. It's the OAuth test client's secret, baked into the frontend so the browser can do the OAuth demo. It becomes public, so use a value meant only for testing.
 

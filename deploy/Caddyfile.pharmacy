@@ -2,7 +2,7 @@
 # (or `import` this file from it); it does not touch any other site.
 # Caddy obtains and renews the TLS certificate by itself.
 #
-# 127.0.0.1:8080 must match ADDR in /etc/frege-pharmacy/pharmacy.env.
+# 127.0.0.1:8090 must match ADDR in /etc/frege-pharmacy/pharmacy.env.
 
 pharmacy.sukoon.uz {
 	encode zstd gzip
@@ -10,7 +10,7 @@ pharmacy.sukoon.uz {
 	# The API. PUBLIC_URL is https://pharmacy.sukoon.uz/api, so this is the
 	# address in the OpenAPI spec and the one Frege calls.
 	handle_path /api/* {
-		reverse_proxy 127.0.0.1:8080 {
+		reverse_proxy 127.0.0.1:8090 {
 			# Signed partner requests sign the path the client sent, /api included.
 			header_up X-Forwarded-Prefix /api
 		}
@@ -19,7 +19,7 @@ pharmacy.sukoon.uz {
 	# Pages the backend renders itself, whose links and forms use these paths.
 	@backend path /oauth/authorize /oauth/token /docs /docs/* /openapi.yaml
 	handle @backend {
-		reverse_proxy 127.0.0.1:8080
+		reverse_proxy 127.0.0.1:8090
 	}
 
 	# The frontend: a single-page app, so unknown paths fall back to index.html.
