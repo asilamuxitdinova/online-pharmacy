@@ -66,11 +66,12 @@ else
   exit 1
 fi
 
-# Keep the newest $keep releases (current is always among them).
-mapfile -t old < <(ls -1dt "$base"/releases/*/ 2>/dev/null | tail -n +$((keep + 1)))
-for dir in "${old[@]}"; do
-  [ "${dir%/}" = "$(readlink "$base/current")" ] && continue
-  rm -rf "$dir"
+# Keep the newest $keep releases. Names start with a UTC timestamp
+# (YYYYmmddHHMMSS-sha), so sorting by name is sorting by age.
+mapfile -t old < <(find "$base/releases" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -r | tail -n +$((keep + 1)))
+for name in "${old[@]}"; do
+  [ "$base/releases/$name" = "$(readlink "$base/current")" ] && continue
+  rm -rf "${base:?}/releases/$name"
 done
 rm -f "$tarball"
 log "done"

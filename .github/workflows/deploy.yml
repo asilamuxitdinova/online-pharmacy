@@ -127,17 +127,20 @@ jobs:
           USER_: ${{ secrets.DEPLOY_USER }}
           HEALTH_URL: ${{ vars.HEALTH_URL || 'http://127.0.0.1:8090/health' }}
         run: |
+          # The remote commands are built here on the runner on purpose (SC2029).
           ssh_opts=(-i ~/.ssh/deploy_key -p "$PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes)
           incoming="frege-pharmacy-incoming"
+          # shellcheck disable=SC2029
           ssh "${ssh_opts[@]}" "$USER_@$HOST" "mkdir -p ~/$incoming"
           scp -P "$PORT" -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
             "frege-pharmacy-$RELEASE.tar.gz" deploy/remote-deploy.sh "$USER_@$HOST:$incoming/"
+          # shellcheck disable=SC2029
           ssh "${ssh_opts[@]}" "$USER_@$HOST" \
             "bash ~/$incoming/remote-deploy.sh ~/$incoming/frege-pharmacy-$RELEASE.tar.gz '$RELEASE' '$HEALTH_URL'"
 
       - name: Smoke test through the public address
         run: |
-          for i in $(seq 1 10); do
+          for _ in $(seq 1 10); do
             if curl -fsS "$SITE/api/health" | tee /dev/stderr | grep -q "\"$RELEASE\""; then ok=1; break; fi
             sleep 3
           done
