@@ -1,0 +1,21 @@
+<h1>Payments</h1>
+<p>Pay an order with <code>POST /orders/{id}/pay</code>, using either a saved card (<code>{"card_id"}</code>) or a card used once (<code>{"card": {"number", "exp_month", "exp_year", "cvc"}}</code>).</p>
+<p class="note">Paying moves money. An assistant must get a clear yes from the customer, naming the order and the total, before calling it.</p>
+<ul>
+<li>An order is charged at most once. Paying a paid order answers <code>409 order_already_paid</code>.</li>
+<li>A refused card answers <code>402</code> with <code>card_declined</code> or <code>insufficient_funds</code>. No money is taken and the order stays <code>pending_payment</code>.</li>
+<li>Card numbers are never stored or returned. Only the brand and the last four digits are kept.</li>
+</ul>
+<h2>Accepted cards</h2>
+<p>Visa, Mastercard, Uzcard and Humo, 16 digits.</p>
+<h2>Test cards</h2>
+<p>Any 16-digit number that passes the checksum is approved, except these. Use any future expiry and any 3-digit CVC.</p>
+<table><tr><th>Number</th><th>Brand</th><th>Result</th></tr>
+<tr><td><code>4242 4242 4242 4242</code></td><td>Visa</td><td>Approved</td></tr>
+<tr><td><code>5555 5555 5555 4444</code></td><td>Mastercard</td><td>Approved</td></tr>
+<tr><td><code>8600 0000 0000 0007</code></td><td>Uzcard</td><td>Approved</td></tr>
+<tr><td><code>9860 0000 0000 0000</code></td><td>Humo</td><td>Approved</td></tr>
+<tr><td><code>4000 0000 0000 0002</code></td><td>Visa</td><td>Declined (<code>card_declined</code>)</td></tr>
+<tr><td><code>4000 0000 0000 9995</code></td><td>Visa</td><td>Insufficient funds</td></tr>
+<tr><td><code>8600 0000 0000 0999</code></td><td>Uzcard</td><td>Declined</td></tr>
+<tr><td><code>9860 0000 0000 0992</code></td><td>Humo</td><td>Insufficient funds</td></tr></table>

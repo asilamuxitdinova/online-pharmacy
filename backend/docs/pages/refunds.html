@@ -1,0 +1,16 @@
+<h1>Refund policy</h1>
+<p>Customers can ask for money back on a paid order with <code>POST /orders/{id}/refunds</code>, giving an amount in UZS and a reason.</p>
+<h2>Who decides</h2>
+<table><tr><th>Amount asked for</th><th>Decision</th></tr>
+<tr><td>Up to and including <strong>200 000 UZS</strong></td><td>Approved automatically and at once. The money is returned to the card.</td></tr>
+<tr><td>More than <strong>200 000 UZS</strong></td><td>Waits for a pharmacist (status <code>pending_review</code>). No money moves until a member of staff approves it with <code>POST /staff/refunds/{id}/approve</code>.</td></tr></table>
+<p class="note">An assistant must never approve a refund over 200 000 UZS on its own, and must tell the customer that a pharmacist will review it.</p>
+<h2>Limits</h2>
+<ul>
+<li>The total of all refunds, approved and pending, cannot exceed what was paid, delivery included.</li>
+<li>Several partial refunds are allowed. When the full amount has been returned the order becomes <code>refunded</code>.</li>
+<li>Only paid orders can be refunded. An unpaid order is cancelled instead.</li>
+<li>Prescription medicine that has left the pharmacy is refunded only for a pharmacy error (wrong item, damaged pack).</li>
+</ul>
+<h2>Timing</h2>
+<p>Approved refunds reach the card in 3 to 5 working days for Visa and Mastercard and within 1 working day for Uzcard and Humo.</p>

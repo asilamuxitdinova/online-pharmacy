@@ -1,0 +1,1836 @@
+openapi: 3.1.0
+info:
+  title: Test Pharmacy API
+  version: 1.0.0
+  description: |
+    Customers browse medicines, upload prescriptions, order, pay and ask for refunds.
+    Pharmacists (role `staff`) review prescriptions and refunds over 200 000 UZS.
+    Administrators manage accounts. Every value in this system is made up.
+
+    Amounts are whole Uzbek soʻm (UZS). Times are UTC, RFC 3339.
+    Send `Locale: ru` or `Locale: uz` for Russian or Uzbek names and messages.
+
+    Rules an assistant must follow:
+    - Paying an order moves money: confirm the order id and total with the customer first.
+    - Never approve a refund over 200 000 UZS without a pharmacist's decision.
+    - Deleting a user cannot be undone.
+    Policy pages with the exact rules are under /docs/.
+servers:
+  - url: https://pharmacy.example.test
+    description: The one pinned https address. Credentials are only sent here.
+tags:
+  - name: auth
+    description: Sign-in machinery. Used by Frege's sign-in flows, not as tools.
+  - name: me
+    description: The signed-in user's own profile, addresses, cards and API keys.
+  - name: catalog
+    description: Medicines and categories. Public.
+  - name: prescriptions
+  - name: orders
+  - name: payments
+    description: Money moves here. Confirm with the customer before calling.
+  - name: jobs
+    description: Slow work that answers 202 and finishes later.
+  - name: staff
+    description: Pharmacist tools. Need the staff role.
+  - name: admin
+    description: Account administration. Need the admin role.
+  - name: partner
+    description: Wholesale partner endpoints. Signed requests, no user.
+  - name: testing
+    description: Failures and delays on request.
+
+security:
+  - bearerAuth: []
+  - oauth2: []
+  - apiKeyHeader: []
+  - apiKeyQuery: []
+  - cookieAuth: []
+
+paths:
+  # ---------------------------------------------------------------- auth
+  /auth/register:
+    post:
+      operationId: register_account
+      tags: [auth]
+      x-frege-auth-op: true
+      summary: Create a customer account and sign it in
+      description: Creates a customer and returns tokens as if they had just signed in. Fails with 409 if the email or phone is taken.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, password, name]
+              properties:
+                email: {type: string, format: email, example: new.customer@pharmacy.test}
+                password: {type: string, minLength: 8, description: At least 8 characters with a digit and an uppercase letter., example: Secret123!}
+                name: {type: string, minLength: 2, maxLength: 80, example: New Customer}
+                phone: {type: string, pattern: '^\+998\d{9}$', example: '+998901234567'}
+      responses:
+        '201': {$ref: '#/components/responses/Tokens'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /auth/login:
+    post:
+      operationId: sign_in_with_password
+      tags: [auth]
+      x-frege-auth-op: true
+      summary: Sign in with email and password
+      description: Returns an access token, a refresh token and the user. After 5 wrong passwords the account is locked for 5 minutes (429 with Retry-After).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Credentials'}
+      responses:
+        '200': {$ref: '#/components/responses/Tokens'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  /auth/otp/request:
+    post:
+      operationId: request_sign_in_code
+      tags: [auth]
+      x-frege-auth-op: true
+      summary: Send a one-time sign-in code by email or SMS
+      description: Sends a 6-digit code valid for 5 minutes. Answers 202 whether or not an account exists. One request per destination every 30 seconds.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [channel, destination]
+              properties:
+                channel: {type: string, enum: [email, sms]}
+                destination: {type: string, description: 'An email for channel email, a +998 phone number for sms.', example: aziza@pharmacy.test}
+      responses:
+        '202':
+          description: The code was sent (or would have been, if an account exists).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string, const: sent}
+                  channel: {type: string}
+                  destination_hint: {type: string, example: 'a****@pharmacy.test'}
+                  expires_in: {type: integer, description: Seconds.}
+                  resend_after: {type: integer, description: Seconds.}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  /auth/otp/verify:
+    post:
+      operationId: verify_sign_in_code
+      tags: [auth]
+      x-frege-auth-op: true
+      summary: Sign in with a one-time code
+      description: Exchanges the latest code sent to the destination for tokens. Five wrong codes kill the code.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [destination, code]
+              properties:
+                destination: {type: string, example: aziza@pharmacy.test}
+                code: {type: string, pattern: '^\d{6}$', example: '123456'}
+      responses:
+        '200': {$ref: '#/components/responses/Tokens'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  /auth/refresh:
+    post:
+      operationId: refresh_access_token
+      tags: [auth]
+      x-frege-auth-op: true
+      summary: Swap a refresh token for a new access token and a new refresh token
+      description: The old refresh token stops working. Replaying a refresh token that was already used ends the whole sign-in (401 refresh_reused).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [refresh_token]
+              properties:
+                refresh_token: {type: string, example: rt_ABCDEF}
+      responses:
+        '200': {$ref: '#/components/responses/Tokens'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /auth/logout:
+    post:
+      operationId: sign_out
+      tags: [auth]
+      summary: Sign out of this session, or of every session
+      description: Ends the current sign-in, or every sign-in of the user with all_sessions true. Ended tokens are refused on the next request.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                all_sessions: {type: boolean, default: false}
+      responses:
+        '204': {description: Signed out. No body.}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+
+  /auth/session:
+    post:
+      operationId: start_cookie_session
+      tags: [auth]
+      x-frege-auth-op: true
+      summary: Sign in and get a session cookie instead of a token
+      description: Sets an HTTP-only pharm_session cookie that every endpoint accepts. Same lockout rule as password sign-in.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Credentials'}
+      responses:
+        '200':
+          description: Signed in. The cookie is in Set-Cookie.
+          headers:
+            Set-Cookie: {schema: {type: string}, description: 'pharm_session=cs_…; HttpOnly; Secure; SameSite=Lax'}
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id: {type: string}
+                  expires_at: {type: string, format: date-time}
+                  user: {$ref: '#/components/schemas/User'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    delete:
+      operationId: end_cookie_session
+      tags: [auth]
+      summary: End the cookie session
+      description: Only for a cookie sign-in; token sign-ins use sign_out.
+      security:
+        - cookieAuth: []
+      responses:
+        '204': {description: Ended. The cookie is cleared.}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+
+  /oauth/authorize:
+    get:
+      operationId: oauth_authorize
+      tags: [auth]
+      x-frege-auth-op: true
+      summary: OAuth 2.0 authorization page (browser)
+      description: Shows a sign-in page. On success the browser is redirected to redirect_uri with code and state. PKCE with S256 is required.
+      security: []
+      parameters:
+        - {name: response_type, in: query, required: true, schema: {type: string, const: code}}
+        - {name: client_id, in: query, required: true, schema: {type: string}, example: frege-test}
+        - {name: redirect_uri, in: query, required: true, schema: {type: string, format: uri}}
+        - {name: code_challenge, in: query, required: true, schema: {type: string}, description: BASE64URL(SHA256(code_verifier)) without padding.}
+        - {name: code_challenge_method, in: query, required: true, schema: {type: string, const: S256}}
+        - {name: state, in: query, required: false, schema: {type: string}}
+        - {name: scope, in: query, required: false, schema: {type: string}}
+      responses:
+        '200': {description: The sign-in page., content: {text/html: {schema: {type: string}}}}
+        '302': {description: Redirect back to the client with code or error.}
+        '400': {description: Unknown client or redirect address., content: {text/html: {schema: {type: string}}}}
+
+  /oauth/token:
+    post:
+      operationId: oauth_token
+      tags: [auth]
+      x-frege-auth-op: true
+      summary: OAuth 2.0 token endpoint
+      description: grant_type authorization_code (with code_verifier) or refresh_token. Client authentication by HTTP Basic or client_id and client_secret fields. Errors follow RFC 6749.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: {$ref: '#/components/schemas/TokenRequest'}
+          application/json:
+            schema: {$ref: '#/components/schemas/TokenRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/Tokens'}
+        '400':
+          description: invalid_request, invalid_grant or unsupported_grant_type.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OAuthError'}
+        '401':
+          description: invalid_client.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OAuthError'}
+
+  # ---------------------------------------------------------------- me
+  /me:
+    get:
+      operationId: get_me
+      tags: [me]
+      summary: Who am I
+      description: The signed-in user, their role and how they signed in. Call this first after any sign-in.
+      parameters:
+        - $ref: '#/components/parameters/Locale'
+        - $ref: '#/components/parameters/ActAs'
+      responses:
+        '200':
+          description: The user.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/User'
+                  - type: object
+                    properties:
+                      auth_method: {type: string, enum: [bearer, cookie, api_key]}
+                      session_id: {type: string}
+                      acting_as: {type: boolean}
+                      actor: {type: object, description: Present when staff act as this customer.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    patch:
+      operationId: update_me
+      tags: [me]
+      summary: Change my name or phone
+      parameters:
+        - $ref: '#/components/parameters/ActAs'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              minProperties: 1
+              properties:
+                name: {type: string, minLength: 2, maxLength: 80}
+                phone: {type: string, pattern: '^\+998\d{9}$'}
+      responses:
+        '200': {description: The updated user., content: {application/json: {schema: {$ref: '#/components/schemas/User'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /me/addresses:
+    get:
+      operationId: list_my_addresses
+      tags: [me]
+      summary: List my delivery addresses
+      parameters:
+        - $ref: '#/components/parameters/ActAs'
+      responses:
+        '200':
+          description: Addresses.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Address'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    post:
+      operationId: add_address
+      tags: [me]
+      summary: Add a delivery address
+      parameters:
+        - $ref: '#/components/parameters/ActAs'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [label, line1, city, phone]
+              properties:
+                label: {type: string, maxLength: 40, example: Work}
+                line1: {type: string, minLength: 5, maxLength: 200, example: '3 Amir Temur avenue, office 12'}
+                city: {type: string, enum: [Tashkent, Samarkand, Bukhara, Andijan, Namangan, Fergana, Nukus, Khiva]}
+                phone: {type: string, pattern: '^\+998\d{9}$', example: '+998901234567'}
+      responses:
+        '201': {description: Created., content: {application/json: {schema: {$ref: '#/components/schemas/Address'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /me/addresses/{id}:
+    delete:
+      operationId: delete_address
+      tags: [me]
+      summary: Delete one of my addresses
+      description: Refused with 409 while an unpaid order uses it.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/ActAs'
+      responses:
+        '204': {description: Deleted. No body.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /me/cards:
+    get:
+      operationId: list_my_cards
+      tags: [me, payments]
+      summary: List my saved cards (brand and last four digits only)
+      parameters:
+        - $ref: '#/components/parameters/ActAs'
+      responses:
+        '200':
+          description: Cards.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Card'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    post:
+      operationId: add_card
+      tags: [me, payments]
+      summary: Save a payment card
+      description: The number is checked and dropped. Only the brand and last four digits are stored or returned. Never repeat a card number back to the user.
+      parameters:
+        - $ref: '#/components/parameters/ActAs'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CardInput'}
+      responses:
+        '201': {description: Saved., content: {application/json: {schema: {$ref: '#/components/schemas/Card'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '402': {$ref: '#/components/responses/PaymentRefused'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /me/cards/{id}:
+    delete:
+      operationId: delete_card
+      tags: [me, payments]
+      summary: Remove a saved card
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/ActAs'
+      responses:
+        '204': {description: Removed. No body.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /me/api-keys:
+    get:
+      operationId: list_my_api_keys
+      tags: [me]
+      summary: List my API keys (prefixes only)
+      responses:
+        '200':
+          description: Keys.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: {$ref: '#/components/schemas/ApiKey'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    post:
+      operationId: create_api_key
+      tags: [me]
+      summary: Create an API key
+      description: The answer contains the full key once. It is a secret; do not show it in chat unless the user asked for it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: {type: string, maxLength: 60, example: My script}
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiKey'
+                  - type: object
+                    properties:
+                      key: {type: string, example: phk_test_abcdefghijklmnop}
+                      notice: {type: string}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /me/api-keys/{id}:
+    delete:
+      operationId: revoke_api_key
+      tags: [me]
+      summary: Revoke an API key
+      description: The key stops working at once.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204': {description: Revoked. No body.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  # ---------------------------------------------------------------- catalog
+  /health:
+    get:
+      operationId: health_check
+      tags: [catalog]
+      summary: Is the service up
+      security: []
+      responses:
+        '200':
+          description: Up.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string, enum: [ok, degraded]}
+                  version: {type: string}
+                  time: {type: string, format: date-time}
+                  uptime_seconds: {type: integer}
+        '503': {description: The database is unreachable.}
+
+  /categories:
+    get:
+      operationId: list_categories
+      tags: [catalog]
+      summary: List product categories
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Locale'
+      responses:
+        '200':
+          description: Categories.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: {type: string, example: pain-relief}
+                        name: {type: string}
+                        product_count: {type: integer}
+
+  /products:
+    get:
+      operationId: search_products
+      tags: [catalog]
+      summary: Search and browse medicines
+      description: Free-text search across English, Russian and Uzbek names, with filters and sorting. Paged with page and page_size; total says how many match. An empty data list means nothing matched.
+      security: []
+      parameters:
+        - {name: q, in: query, schema: {type: string}, description: 'Words to look for in the name, manufacturer or SKU.', example: ibuprofen}
+        - {name: category, in: query, schema: {type: string, enum: [pain-relief, cold-flu, antibiotics, allergy, digestion, vitamins, heart, diabetes, skin, eye-ear, first-aid, baby]}}
+        - {name: min_price, in: query, schema: {type: integer, minimum: 0}, description: UZS.}
+        - {name: max_price, in: query, schema: {type: integer, minimum: 0}, description: UZS.}
+        - {name: requires_prescription, in: query, schema: {type: boolean}}
+        - {name: in_stock, in: query, schema: {type: boolean}}
+        - {name: sort, in: query, schema: {type: string, enum: [name, -name, price, -price, newest], default: name}, description: A leading minus sorts descending.}
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Locale'
+      responses:
+        '200':
+          description: One page of products.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageInfo'
+                  - type: object
+                    properties:
+                      data: {type: array, items: {$ref: '#/components/schemas/Product'}}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /products/export:
+    get:
+      operationId: export_products
+      tags: [catalog]
+      summary: Export the whole catalog (about 1000 rows)
+      description: A deliberately large answer. CSV by default; format=json for JSON. Prefer search_products for questions about a few products.
+      security: []
+      parameters:
+        - {name: format, in: query, schema: {type: string, enum: [csv, json], default: csv}}
+        - $ref: '#/components/parameters/Locale'
+      responses:
+        '200':
+          description: Every product.
+          content:
+            text/csv:
+              schema: {type: string}
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Product'}}
+                  total: {type: integer}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /products/{id}:
+    get:
+      operationId: get_product
+      tags: [catalog]
+      summary: Get one product
+      security: []
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, pattern: '^prd_\d{4}$'}, example: prd_0001}
+        - $ref: '#/components/parameters/Locale'
+      responses:
+        '200': {description: The product., content: {application/json: {schema: {$ref: '#/components/schemas/Product'}}}}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  # ---------------------------------------------------------------- prescriptions
+  /prescriptions:
+    get:
+      operationId: list_my_prescriptions
+      tags: [prescriptions]
+      summary: List my prescriptions and their review status
+      parameters:
+        - $ref: '#/components/parameters/ActAs'
+      responses:
+        '200':
+          description: Prescriptions, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Prescription'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    post:
+      operationId: upload_prescription
+      tags: [prescriptions]
+      summary: Upload a prescription for a pharmacist to review
+      description: Starts as pending_review. Only an approved prescription can be used in an order. Valid one year from issue.
+      parameters:
+        - $ref: '#/components/parameters/ActAs'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [doctor_name, clinic, issued_on, diagnosis]
+              properties:
+                doctor_name: {type: string, minLength: 3, example: Dr. Example}
+                clinic: {type: string, minLength: 3, example: City Clinic No. 0}
+                issued_on: {type: string, format: date, example: '2026-10-15'}
+                diagnosis: {type: string, minLength: 3, maxLength: 300}
+      responses:
+        '201': {description: Uploaded., content: {application/json: {schema: {$ref: '#/components/schemas/Prescription'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /prescriptions/{id}:
+    get:
+      operationId: get_prescription
+      tags: [prescriptions]
+      summary: Get one prescription
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/ActAs'
+      responses:
+        '200': {description: The prescription., content: {application/json: {schema: {$ref: '#/components/schemas/Prescription'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  # ---------------------------------------------------------------- orders
+  /orders:
+    get:
+      operationId: list_my_orders
+      tags: [orders]
+      summary: List my orders, newest first
+      description: Cursor paging. Pass next_cursor from one page as cursor for the next; has_more is false on the last page.
+      parameters:
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/OrderStatus'}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+        - {name: cursor, in: query, schema: {type: string}, description: next_cursor from the previous page.}
+        - $ref: '#/components/parameters/Locale'
+        - $ref: '#/components/parameters/ActAs'
+      responses:
+        '200':
+          description: One page of orders.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Order'}}
+                  next_cursor: {type: [string, 'null']}
+                  has_more: {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+    post:
+      operationId: create_order
+      tags: [orders]
+      summary: Place an order
+      description: |
+        Creates an order waiting for payment (it does not charge anything). Prescription-only items need an approved prescription_id.
+        Courier delivery costs 25 000 UZS, free from 300 000 UZS; pickup is free.
+        Send an Idempotency-Key so a retry cannot create a second order.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/Locale'
+        - $ref: '#/components/parameters/ActAs'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OrderInput'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Location: {schema: {type: string}, description: '/orders/{id}'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Order'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/ActAs'
+    get:
+      operationId: get_order
+      tags: [orders]
+      summary: Get one order
+      parameters:
+        - $ref: '#/components/parameters/Locale'
+      responses:
+        '200': {description: The order., content: {application/json: {schema: {$ref: '#/components/schemas/Order'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    put:
+      operationId: replace_order
+      tags: [orders]
+      summary: Replace a whole unpaid order, items included
+      description: Send every field; anything left out is cleared. To change only delivery details use update_order_delivery.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OrderInput'}
+      responses:
+        '200': {description: The replaced order., content: {application/json: {schema: {$ref: '#/components/schemas/Order'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+    patch:
+      operationId: update_order_delivery
+      tags: [orders]
+      summary: Change delivery details of an unpaid order
+      description: Changes only the fields sent (delivery, address, prescription, note). Items cannot be changed here; use replace_order.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              minProperties: 1
+              properties:
+                delivery: {type: string, enum: [courier, pickup]}
+                address_id: {type: string}
+                prescription_id: {type: string}
+                note: {type: string, maxLength: 500}
+      responses:
+        '200': {description: The updated order., content: {application/json: {schema: {$ref: '#/components/schemas/Order'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+    delete:
+      operationId: delete_order
+      tags: [orders]
+      summary: Delete an unpaid or cancelled order
+      description: Paid orders are part of the payment record and cannot be deleted (409).
+      responses:
+        '204': {description: Deleted. No body.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /orders/{id}/cancel:
+    post:
+      operationId: cancel_order
+      tags: [orders]
+      summary: Cancel an order that is not paid yet
+      description: A paid order cannot be cancelled; request_refund instead.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/ActAs'
+      responses:
+        '200': {description: The cancelled order., content: {application/json: {schema: {$ref: '#/components/schemas/Order'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /orders/{id}/pay:
+    post:
+      operationId: pay_order
+      tags: [orders, payments]
+      summary: Pay an order with a card (moves money)
+      description: |
+        Charges the order total to a saved card (card_id) or a card used once (card). Confirm the order and total with the customer and get a clear yes before calling.
+        An order is never charged twice: paying a paid order answers 409. A refused card answers 402 and takes nothing.
+        Send an Idempotency-Key so a retry cannot charge twice.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ActAs'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              description: Exactly one of card_id or card.
+              properties:
+                card_id: {type: string, example: card_aziza_visa}
+                card: {$ref: '#/components/schemas/CardInput'}
+      responses:
+        '200':
+          description: Paid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  order: {$ref: '#/components/schemas/Order'}
+                  payment:
+                    type: object
+                    properties:
+                      id: {type: string}
+                      amount: {type: integer}
+                      currency: {type: string, const: UZS}
+                      status: {type: string, const: succeeded}
+                      card: {type: object, properties: {brand: {type: string}, last4: {type: string}}}
+                      created_at: {type: string, format: date-time}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '402': {$ref: '#/components/responses/PaymentRefused'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /orders/{id}/invoice:
+    get:
+      operationId: get_order_invoice
+      tags: [orders]
+      summary: Printable invoice (HTML, not JSON)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Locale'
+        - $ref: '#/components/parameters/ActAs'
+      responses:
+        '200': {description: An HTML page., content: {text/html: {schema: {type: string}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /orders/{id}/refunds:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/ActAs'
+    get:
+      operationId: list_order_refunds
+      tags: [orders, payments]
+      summary: List refunds of an order and how much is still refundable
+      responses:
+        '200':
+          description: Refunds.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Refund'}}
+                  refundable: {type: integer, description: UZS still available to refund.}
+                  currency: {type: string}
+                  rule: {type: string}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: request_refund
+      tags: [orders, payments]
+      summary: Ask for money back on a paid order (may move money)
+      description: |
+        Up to and including 200 000 UZS is approved automatically and the money goes back at once.
+        Larger amounts wait for a pharmacist (status pending_review) and no money moves yet; tell the customer so.
+        The total of refunds cannot exceed what was paid. Send an Idempotency-Key so a retry cannot refund twice.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [amount, reason]
+              properties:
+                amount: {type: integer, minimum: 1, description: UZS., example: 50000}
+                reason: {type: string, minLength: 3, maxLength: 300, example: Wrong item delivered}
+      responses:
+        '201':
+          description: Recorded.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Refund'
+                  - type: object
+                    properties:
+                      auto_approved: {type: boolean}
+                      rule: {type: string}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  # ---------------------------------------------------------------- jobs
+  /stock-checks:
+    post:
+      operationId: start_stock_check
+      tags: [jobs]
+      summary: Check a product's stock in every branch (slow)
+      description: Answers 202 with a job. The result is not ready yet; poll get_job until status is succeeded or failed and only then report it.
+      parameters:
+        - $ref: '#/components/parameters/ActAs'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [product_id]
+              properties:
+                product_id: {type: string, example: prd_0001}
+                simulate_failure: {type: boolean, default: false, description: 'Make the job fail, for testing.'}
+      responses:
+        '202': {$ref: '#/components/responses/JobAccepted'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /jobs/{id}:
+    get:
+      operationId: get_job
+      tags: [jobs]
+      summary: Check a slow job
+      description: status is running (with progress 0-100), then succeeded (with result) or failed (with error). While running, Retry-After suggests when to look again.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Locale'
+        - $ref: '#/components/parameters/ActAs'
+      responses:
+        '200': {description: The job., content: {application/json: {schema: {$ref: '#/components/schemas/Job'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  # ---------------------------------------------------------------- staff
+  /staff/orders:
+    get:
+      operationId: staff_list_orders
+      tags: [staff]
+      summary: List everyone's orders (staff)
+      parameters:
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/OrderStatus'}}
+        - {name: user_id, in: query, schema: {type: string}}
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Locale'
+      responses:
+        '200':
+          description: One page of orders.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageInfo'
+                  - type: object
+                    properties:
+                      data: {type: array, items: {$ref: '#/components/schemas/Order'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /staff/customers:
+    get:
+      operationId: staff_search_customers
+      tags: [staff]
+      summary: Find customers by name, email or phone (staff)
+      description: Includes the taxpayer number (tin), which is sensitive.
+      parameters:
+        - {name: q, in: query, schema: {type: string}, example: aziza}
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of customers.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageInfo'
+                  - type: object
+                    properties:
+                      data: {type: array, items: {$ref: '#/components/schemas/StaffUser'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+
+  /staff/customers/{id}:
+    get:
+      operationId: staff_get_customer
+      tags: [staff]
+      summary: Look up one customer with their taxpayer number (staff)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: The customer.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StaffUser'
+                  - type: object
+                    properties:
+                      order_count: {type: integer}
+                      prescription_count: {type: integer}
+                      lifetime_spent: {type: integer}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /staff/refunds:
+    get:
+      operationId: staff_list_refunds
+      tags: [staff]
+      summary: List refunds waiting for a pharmacist (staff)
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [pending_review, approved, rejected], default: pending_review}}
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of refunds.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageInfo'
+                  - type: object
+                    properties:
+                      data: {type: array, items: {$ref: '#/components/schemas/Refund'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+
+  /staff/refunds/{id}/approve:
+    post:
+      operationId: staff_approve_refund
+      tags: [staff, payments]
+      summary: Approve a pending refund (staff, moves money)
+      description: Returns the money to the customer's card. A person must make this decision; do not approve on your own initiative.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DecisionNote'}
+      responses:
+        '200': {description: Approved., content: {application/json: {schema: {$ref: '#/components/schemas/Refund'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /staff/refunds/{id}/reject:
+    post:
+      operationId: staff_reject_refund
+      tags: [staff]
+      summary: Reject a pending refund (staff)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DecisionNote'}
+      responses:
+        '200': {description: Rejected., content: {application/json: {schema: {$ref: '#/components/schemas/Refund'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /staff/prescriptions:
+    get:
+      operationId: staff_list_prescriptions
+      tags: [staff]
+      summary: List prescriptions to review (staff)
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [pending_review, approved, rejected], default: pending_review}}
+      responses:
+        '200':
+          description: Prescriptions.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Prescription'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+
+  /staff/prescriptions/{id}/review:
+    post:
+      operationId: staff_review_prescription
+      tags: [staff]
+      summary: Approve or reject a prescription (staff)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision]
+              properties:
+                decision: {type: string, enum: [approve, reject]}
+                note: {type: string, description: Required when rejecting.}
+      responses:
+        '200': {description: Reviewed., content: {application/json: {schema: {$ref: '#/components/schemas/Prescription'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /staff/reports/sales:
+    post:
+      operationId: staff_start_sales_report
+      tags: [staff, jobs]
+      summary: Start a sales report for a date range (staff, slow)
+      description: Answers 202 with a job; poll get_job for the result.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [from, to]
+              properties:
+                from: {type: string, format: date, example: '2026-10-01'}
+                to: {type: string, format: date, example: '2026-10-31'}
+      responses:
+        '202': {$ref: '#/components/responses/JobAccepted'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  # ---------------------------------------------------------------- admin
+  /admin/users:
+    get:
+      operationId: admin_list_users
+      tags: [admin]
+      summary: List all users (admin)
+      parameters:
+        - {name: role, in: query, schema: {$ref: '#/components/schemas/Role'}}
+        - {name: q, in: query, schema: {type: string}}
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: One page of users.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageInfo'
+                  - type: object
+                    properties:
+                      data: {type: array, items: {$ref: '#/components/schemas/StaffUser'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /admin/users/{id}/role:
+    patch:
+      operationId: admin_change_role
+      tags: [admin]
+      summary: Change a user's role (admin)
+      description: Changes who can do what. Takes effect on the user's very next request.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [role]
+              properties:
+                role: {$ref: '#/components/schemas/Role'}
+      responses:
+        '200':
+          description: The user with the new role.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StaffUser'
+                  - type: object
+                    properties:
+                      previous_role: {$ref: '#/components/schemas/Role'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /admin/users/{id}/disable:
+    post:
+      operationId: admin_disable_user
+      tags: [admin]
+      summary: Disable an account (admin)
+      description: Every call the user makes is refused with 403 account_disabled until it is enabled again.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': {description: Disabled., content: {application/json: {schema: {$ref: '#/components/schemas/StaffUser'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /admin/users/{id}/enable:
+    post:
+      operationId: admin_enable_user
+      tags: [admin]
+      summary: Enable a disabled account (admin)
+      description: Also clears a sign-in lockout.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': {description: Enabled., content: {application/json: {schema: {$ref: '#/components/schemas/StaffUser'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /admin/users/{id}:
+    delete:
+      operationId: admin_delete_user
+      tags: [admin]
+      summary: Permanently delete an account and everything it owns (admin, cannot be undone)
+      description: |
+        Deletes the user, their orders, payments, prescriptions, cards and keys. THIS CANNOT BE UNDONE.
+        Ask the person to confirm, naming the account. confirm_email must repeat the account's email.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - {name: confirm_email, in: query, required: true, schema: {type: string, format: email}, description: The email of the account being deleted.}
+      responses:
+        '204': {description: Deleted. No body.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  # ---------------------------------------------------------------- partner
+  /partner/inventory:
+    get:
+      operationId: partner_get_inventory
+      tags: [partner]
+      summary: Stock and price per SKU (signed partner request)
+      security:
+        - partnerSignature: []
+      parameters:
+        - $ref: '#/components/parameters/PartnerClient'
+        - $ref: '#/components/parameters/PartnerTimestamp'
+        - {name: sku, in: query, schema: {type: string}, example: PH-0001}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 100}}
+      responses:
+        '200':
+          description: Inventory rows.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        sku: {type: string}
+                        product_id: {type: string}
+                        stock: {type: integer}
+                        price: {type: integer}
+                        currency: {type: string}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  /partner/restock:
+    post:
+      operationId: partner_restock
+      tags: [partner]
+      summary: Add delivered stock to a SKU (signed partner request)
+      security:
+        - partnerSignature: []
+      parameters:
+        - $ref: '#/components/parameters/PartnerClient'
+        - $ref: '#/components/parameters/PartnerTimestamp'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [sku, quantity]
+              properties:
+                sku: {type: string, example: PH-0017}
+                quantity: {type: integer, minimum: 1, maximum: 10000}
+      responses:
+        '200':
+          description: New stock level.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sku: {type: string}
+                  added: {type: integer}
+                  stock: {type: integer}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+  # ---------------------------------------------------------------- testing
+  /_test/fail:
+    get:
+      operationId: test_fail
+      tags: [testing]
+      summary: Fail on purpose (testing)
+      description: Answers the requested error status after an optional delay. flaky_key fails on odd calls and succeeds on the retry. mode=close drops the connection.
+      security: []
+      parameters:
+        - {name: status, in: query, schema: {type: integer, minimum: 400, maximum: 599, default: 503}}
+        - {name: delay, in: query, schema: {type: number, minimum: 0, maximum: 60}, description: Seconds to wait first.}
+        - {name: flaky_key, in: query, schema: {type: string}, description: 'Fail on odd calls with this key, succeed on even ones.'}
+        - {name: mode, in: query, schema: {type: string, enum: [close]}, description: close drops the connection without an answer.}
+      responses:
+        '200': {description: 'Only with flaky_key, on the retry.'}
+        default: {$ref: '#/components/responses/Error'}
+
+  /_test/delay:
+    get:
+      operationId: test_delay
+      tags: [testing]
+      summary: Wait a number of seconds, then answer (testing)
+      security: []
+      parameters:
+        - {name: seconds, in: query, required: true, schema: {type: number, minimum: 0, maximum: 120}}
+      responses:
+        '200':
+          description: Waited.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  waited_seconds: {type: number}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+
+webhooks:
+  order.paid:
+    post:
+      operationId: webhook_order_paid
+      summary: Sent when an order is paid
+      description: POSTed to WEBHOOK_URL, signed with X-Webhook-Signature = "sha256=" + hex HMAC-SHA256 of "<X-Webhook-Timestamp>.<body>".
+      parameters:
+        - $ref: '#/components/parameters/WebhookTimestamp'
+        - $ref: '#/components/parameters/WebhookSignature'
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Event'}
+      responses:
+        '200': {description: Received.}
+  refund.approved:
+    post:
+      operationId: webhook_refund_approved
+      summary: Sent when a refund is approved, automatically or by staff
+      parameters:
+        - $ref: '#/components/parameters/WebhookTimestamp'
+        - $ref: '#/components/parameters/WebhookSignature'
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Event'}
+      responses:
+        '200': {description: Received.}
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from sign_in_with_password, verify_sign_in_code, register_account, refresh_access_token or the OAuth token endpoint. Also accepts an API key (phk_test_…).
+    oauth2:
+      type: oauth2
+      description: Authorization code with PKCE (S256 only).
+      flows:
+        authorizationCode:
+          authorizationUrl: https://pharmacy.example.test/oauth/authorize
+          tokenUrl: https://pharmacy.example.test/oauth/token
+          refreshUrl: https://pharmacy.example.test/oauth/token
+          scopes: {}
+    apiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    apiKeyQuery:
+      type: apiKey
+      in: query
+      name: api_key
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: pharm_session
+    partnerSignature:
+      type: apiKey
+      in: header
+      name: X-Signature
+      description: 'Hex HMAC-SHA256 with the partner secret of "<X-Timestamp>\n<METHOD>\n<path?query>\n<hex sha256(body)>". Also send X-Client-Id and X-Timestamp (unix seconds, within 5 minutes).'
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: {type: string}
+    Page:
+      name: page
+      in: query
+      schema: {type: integer, minimum: 1, default: 1}
+    PageSize:
+      name: page_size
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+    Locale:
+      name: Locale
+      in: header
+      description: Language of names and messages.
+      schema: {type: string, enum: [en, ru, uz], default: en}
+    ActAs:
+      name: X-Act-As
+      in: header
+      description: Staff only. Act as this customer and see what they see.
+      schema: {type: string, example: usr_aziza}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: Any unique string. A retry with the same key and body returns the first answer instead of acting twice.
+      schema: {type: string, maxLength: 255, example: 7f3c1b0e-order-1}
+    PartnerClient:
+      name: X-Client-Id
+      in: header
+      required: true
+      schema: {type: string, example: partner-demo}
+    PartnerTimestamp:
+      name: X-Timestamp
+      in: header
+      required: true
+      description: Unix seconds.
+      schema: {type: string, example: '1792656000'}
+    WebhookTimestamp:
+      name: X-Webhook-Timestamp
+      in: header
+      required: true
+      schema: {type: string}
+    WebhookSignature:
+      name: X-Webhook-Signature
+      in: header
+      required: true
+      schema: {type: string, example: sha256=5d41…}
+
+  responses:
+    Tokens:
+      description: Signed in.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/TokenSet'}
+    Error:
+      description: An error.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorBody'}
+    BadRequest:
+      description: Broken JSON (invalid_json) or a field the API does not know (unknown_field).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorBody'}
+    Unauthorized:
+      description: Not signed in. code is token_missing, token_invalid, token_expired, session_ended, refresh_reused, invalid_credentials, code_invalid, api_key_revoked or signature_invalid. Renew or sign in again.
+      headers:
+        WWW-Authenticate: {schema: {type: string}}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorBody'}
+    Forbidden:
+      description: Signed in but not allowed. role_required names the needed role in required_role; account_disabled means an admin disabled the account. Do not retry.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorBody'}
+    NotFound:
+      description: No such record, or it belongs to someone else.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorBody'}
+    Conflict:
+      description: The action does not fit the record's current state (details.status), or not enough stock.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorBody'}
+    ValidationFailed:
+      description: Invalid fields, all listed in fields. Fix every one and retry.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorBody'}
+    TooManyRequests:
+      description: Too many attempts. Wait Retry-After seconds.
+      headers:
+        Retry-After: {schema: {type: integer}}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorBody'}
+    PaymentRefused:
+      description: The card was refused (card_declined, insufficient_funds, card_expired). Nothing was charged.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorBody'}
+    JobAccepted:
+      description: Started. The result is not ready; poll get_job.
+      headers:
+        Location: {schema: {type: string}, description: '/jobs/{id}'}
+        Retry-After: {schema: {type: integer}}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Job'}
+
+  schemas:
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [status, code, message]
+          properties:
+            status: {type: integer}
+            code: {type: string, description: Stable machine-readable reason. See /docs/errors.}
+            message: {type: string}
+            required_role: {$ref: '#/components/schemas/Role'}
+            retry_after: {type: integer}
+            fields:
+              type: array
+              items:
+                type: object
+                properties:
+                  field: {type: string, example: 'items[0].quantity'}
+                  code: {type: string}
+                  message: {type: string}
+            details: {type: object}
+            request_id: {type: string}
+    OAuthError:
+      type: object
+      properties:
+        error: {type: string, enum: [invalid_request, invalid_client, invalid_grant, unsupported_grant_type]}
+        error_description: {type: string}
+    Credentials:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: {type: string, format: email, example: aziza@pharmacy.test}
+        password: {type: string, example: Customer123!}
+    TokenRequest:
+      type: object
+      required: [grant_type]
+      properties:
+        grant_type: {type: string, enum: [authorization_code, refresh_token]}
+        code: {type: string}
+        redirect_uri: {type: string}
+        code_verifier: {type: string}
+        refresh_token: {type: string}
+        client_id: {type: string}
+        client_secret: {type: string}
+    TokenSet:
+      type: object
+      properties:
+        access_token: {type: string, description: JWT.}
+        token_type: {type: string, const: Bearer}
+        expires_in: {type: integer, description: Seconds.}
+        refresh_token: {type: string}
+        refresh_expires_in: {type: integer, description: Seconds.}
+        session_id: {type: string}
+        user: {$ref: '#/components/schemas/User'}
+    Role:
+      type: string
+      enum: [customer, staff, admin]
+    User:
+      type: object
+      properties:
+        id: {type: string, example: usr_aziza}
+        email: {type: string}
+        name: {type: string}
+        phone: {type: [string, 'null']}
+        role: {$ref: '#/components/schemas/Role'}
+        created_at: {type: string, format: date-time}
+    StaffUser:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            tin: {type: [string, 'null'], description: Taxpayer number. Sensitive; staff only.}
+            disabled: {type: boolean}
+            disabled_at: {type: [string, 'null'], format: date-time}
+    Address:
+      type: object
+      properties:
+        id: {type: string}
+        label: {type: string}
+        line1: {type: string}
+        city: {type: string}
+        phone: {type: string}
+        created_at: {type: string, format: date-time}
+    CardInput:
+      type: object
+      additionalProperties: false
+      required: [number, exp_month, exp_year, cvc]
+      properties:
+        number: {type: string, description: 16 digits. Test cards are listed in /docs/payments., example: '4242424242424242'}
+        exp_month: {type: integer, minimum: 1, maximum: 12}
+        exp_year: {type: integer, example: 2030}
+        cvc: {type: string, pattern: '^\d{3,4}$'}
+    Card:
+      type: object
+      properties:
+        id: {type: string}
+        brand: {type: string, enum: [visa, mastercard, uzcard, humo]}
+        last4: {type: string}
+        exp_month: {type: integer}
+        exp_year: {type: integer}
+        created_at: {type: string, format: date-time}
+    ApiKey:
+      type: object
+      properties:
+        id: {type: string}
+        name: {type: string}
+        prefix: {type: string}
+        created_at: {type: string, format: date-time}
+        revoked_at: {type: [string, 'null'], format: date-time}
+    PageInfo:
+      type: object
+      properties:
+        page: {type: integer}
+        page_size: {type: integer}
+        total: {type: integer}
+        total_pages: {type: integer}
+    Product:
+      type: object
+      properties:
+        id: {type: string, example: prd_0001}
+        sku: {type: string, example: PH-0001}
+        name: {type: string, example: 'Paracetamol 500 mg, 10 tablets'}
+        category: {type: object, properties: {id: {type: string}, name: {type: string}}}
+        manufacturer: {type: string}
+        form: {type: string, enum: [tablets, capsules, sachets, syrup, drops, cream, spray]}
+        strength: {type: string}
+        pack_size: {type: integer}
+        price: {type: integer, description: UZS.}
+        currency: {type: string, const: UZS}
+        stock: {type: integer}
+        in_stock: {type: boolean}
+        requires_prescription: {type: boolean}
+    Prescription:
+      type: object
+      properties:
+        id: {type: string}
+        user_id: {type: string}
+        doctor_name: {type: string}
+        clinic: {type: string}
+        issued_on: {type: string, format: date}
+        diagnosis: {type: string, description: Medical information.}
+        status: {type: string, enum: [pending_review, approved, rejected]}
+        review_note: {type: [string, 'null']}
+        reviewed_by: {type: [string, 'null']}
+        created_at: {type: string, format: date-time}
+    OrderStatus:
+      type: string
+      enum: [pending_payment, paid, cancelled, partially_refunded, refunded]
+    OrderInput:
+      type: object
+      additionalProperties: false
+      required: [items, delivery]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            additionalProperties: false
+            required: [product_id, quantity]
+            properties:
+              product_id: {type: string, example: prd_0001}
+              quantity: {type: integer, minimum: 1, maximum: 10}
+        delivery: {type: string, enum: [courier, pickup]}
+        address_id: {type: string, description: Required for courier. One of list_my_addresses., example: adr_aziza_home}
+        prescription_id: {type: string, description: An approved prescription. Required when any item needs one., example: rx_aziza_approved}
+        note: {type: string, maxLength: 500}
+    Order:
+      type: object
+      properties:
+        id: {type: string}
+        user_id: {type: string}
+        status: {$ref: '#/components/schemas/OrderStatus'}
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              product_id: {type: string}
+              name: {type: string}
+              quantity: {type: integer}
+              unit_price: {type: integer}
+              line_total: {type: integer}
+        delivery: {type: string, enum: [courier, pickup]}
+        address_id: {type: [string, 'null']}
+        prescription_id: {type: [string, 'null']}
+        note: {type: string}
+        subtotal: {type: integer}
+        delivery_fee: {type: integer}
+        total: {type: integer}
+        refunded: {type: integer}
+        currency: {type: string, const: UZS}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        paid_at: {type: [string, 'null'], format: date-time}
+        links: {type: object, properties: {self: {type: string}, invoice: {type: string}}}
+    Refund:
+      type: object
+      properties:
+        id: {type: string}
+        order_id: {type: string}
+        amount: {type: integer}
+        currency: {type: string, const: UZS}
+        reason: {type: string}
+        status: {type: string, enum: [approved, pending_review, rejected]}
+        decided_by: {type: [string, 'null'], description: '"auto" for automatic approvals, else a staff user id.'}
+        created_at: {type: string, format: date-time}
+        decided_at: {type: [string, 'null'], format: date-time}
+    DecisionNote:
+      type: object
+      additionalProperties: false
+      properties:
+        note: {type: string}
+    Job:
+      type: object
+      properties:
+        id: {type: string}
+        kind: {type: string, enum: [stock_check, sales_report]}
+        status: {type: string, enum: [running, succeeded, failed]}
+        progress: {type: integer, minimum: 0, maximum: 100}
+        estimated_seconds_left: {type: integer}
+        input: {type: object}
+        result: {type: object, description: Present when succeeded.}
+        error: {type: object, properties: {code: {type: string}, message: {type: string}}, description: Present when failed.}
+        created_at: {type: string, format: date-time}
+        finished_at: {type: string, format: date-time}
+        links: {type: object}
+    Event:
+      type: object
+      properties:
+        id: {type: string}
+        type: {type: string, enum: [order.paid, refund.approved]}
+        created_at: {type: string, format: date-time}
+        data: {type: object}

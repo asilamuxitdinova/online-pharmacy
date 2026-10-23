@@ -1,0 +1,14 @@
+<h1>Test Pharmacy</h1>
+<p>Test Pharmacy is an online pharmacy that exists only to test Frege. Everything in it is made up: the medicines, the people, the card numbers and the taxpayer numbers. You can reset it to a clean state at any time.</p>
+<p>Customers browse medicines, upload prescriptions, place orders, pay with a card and ask for refunds. Pharmacists (the <em>staff</em> role) review prescriptions and larger refunds. Administrators manage accounts.</p>
+<h2>Where to start</h2>
+<ul>
+<li><a href="/openapi.yaml">OpenAPI specification</a>: every endpoint, used as Frege's tool list.</li>
+<li><a href="/docs/authentication">Authentication</a>: password, one-time codes, OAuth 2.0 with PKCE, API keys, session cookies and signed requests.</li>
+<li><a href="/docs/roles">Roles</a>: what customers, pharmacists and administrators may do.</li>
+<li><a href="/docs/refunds">Refund policy</a> and <a href="/docs/delivery">delivery</a>: the business rules, with amounts.</li>
+<li><a href="/docs/errors">Error codes</a>: every error the API returns and what to do about it.</li>
+<li><a href="/docs/testing">Testing helpers</a>: seeded accounts, test cards, the demo inbox and failures on request.</li>
+</ul>
+<h2>Basics</h2>
+<p>All amounts are whole Uzbek soʻm (UZS), for example <code>"price": 4000</code>. Times are UTC in RFC 3339 format. Product names and many messages are available in English, Russian and Uzbek: send <code>Locale: ru</code> or <code>Locale: uz</code> (or the standard <code>Accept-Language</code> header).</p>

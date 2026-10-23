@@ -1,0 +1,21 @@
+<h1>Testing helpers</h1>
+<p>These exist only because this is a test system.</p>
+<h2>Seeded accounts</h2>
+<table><tr><th>Email</th><th>Password</th><th>Role</th><th>API key</th></tr>
+<tr><td><code>aziza@pharmacy.test</code></td><td><code>Customer123!</code></td><td>customer</td><td><code>phk_test_customer_aziza_0000000000000001</code></td></tr>
+<tr><td><code>bekzod@pharmacy.test</code></td><td><code>Customer123!</code></td><td>customer</td><td><code>phk_test_customer_bekzod_000000000000002</code></td></tr>
+<tr><td><code>dilnoza@pharmacy.test</code></td><td><code>Staff123!</code></td><td>staff</td><td><code>phk_test_staff_dilnoza_00000000000000003</code></td></tr>
+<tr><td><code>admin@pharmacy.test</code></td><td><code>Admin123!</code></td><td>admin</td><td><code>phk_test_admin_000000000000000000000004</code></td></tr>
+<tr><td><code>timur@pharmacy.test</code></td><td><code>Customer123!</code></td><td>customer, <strong>disabled</strong></td><td>none</td></tr></table>
+<p>Phones are <code>+998900000001</code> to <code>+998900000005</code> in the same order. Aziza has an approved prescription (<code>rx_aziza_approved</code>), a pending one, a saved card that works (<code>card_aziza_visa</code>), one that is declined (<code>card_aziza_declines</code>), and orders in several states. Products have stable ids <code>prd_0001</code> to <code>prd_1000</code>.</p>
+<h2>Endpoints</h2>
+<table><tr><th>Endpoint</th><th>Does</th></tr>
+<tr><td><code>GET /_test/inbox/view</code></td><td>The demo inbox in a browser: one-time codes, notices and webhook deliveries.</td></tr>
+<tr><td><code>GET /_test/inbox?recipient=…&amp;kind=otp</code></td><td>The same as JSON, newest first.</td></tr>
+<tr><td><code>POST /_test/reset</code></td><td>Wipes everything and seeds it again.</td></tr>
+<tr><td><code>GET /_test/fail?status=503&amp;delay=3</code></td><td>Fails on request. <code>flaky_key=x</code> fails on odd calls and works on the retry. <code>mode=close</code> drops the connection.</td></tr>
+<tr><td><code>GET /_test/delay?seconds=10</code></td><td>Waits, then answers. For timeouts.</td></tr>
+<tr><td><code>POST /_test/webhooks</code></td><td>A webhook receiver that checks <code>X-Webhook-Signature: sha256=&lt;hex HMAC of "timestamp.body"&gt;</code> and <code>X-Webhook-Timestamp</code>. Every delivery shows in the inbox, verified or not.</td></tr>
+<tr><td><code>GET /_test/config</code></td><td>The current non-secret settings: token lifetimes, thresholds, whether the fixed one-time code is on.</td></tr></table>
+<h2>Useful settings</h2>
+<p><code>ACCESS_TOKEN_TTL=60s</code> makes renewal visible within a minute. <code>FIXED_OTP_CODE=123456</code> makes every one-time code predictable for scripted demos. <code>JOB_DURATION=15s</code> sets how long slow jobs take.</p>

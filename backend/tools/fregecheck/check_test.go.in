@@ -1,0 +1,35 @@
+// This file is not part of the pharmacy build. `make frege-check` overlays it
+// into Frege's internal/mcp package (nothing is written to that checkout) so
+// the spec is loaded by exactly the code Frege runs in production.
+package mcp
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"testing"
+)
+
+func TestPharmacySpecLoadsInFrege(t *testing.T) {
+	data, err := os.ReadFile(os.Getenv("PHARMACY_SPEC"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, _, err := LoadSpecAny(data)
+	if err != nil {
+		t.Fatalf("Frege refuses the spec: %v", err)
+	}
+	if err := doc.Validate(context.Background()); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	ops := ExtractOperations(doc)
+	names := DedupToolNames(ops)
+	fmt.Printf("base url %s, %d tools\n", ResolveBaseURL(doc, ""), len(ops))
+	for i, op := range ops {
+		paging := ""
+		if op.Paging.Detected() {
+			paging = fmt.Sprintf(" paging=%s(%s)", op.Paging.Style, op.Paging.CursorParam)
+		}
+		fmt.Printf("  %-28s %-6s %s write=%v%s\n", names[i], op.Method, op.Path, IsMutating(op), paging)
+	}
+}

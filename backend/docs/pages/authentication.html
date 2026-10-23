@@ -1,0 +1,36 @@
+<h1>Authentication</h1>
+<p>Every endpoint except the catalog, health check and documentation needs a signed-in user. The API accepts several kinds of credential so that each sign-in style can be tested.</p>
+<h2>Password sign-in</h2>
+<p><code>POST /auth/login</code> with <code>{"email", "password"}</code> returns an <code>access_token</code> (a signed JWT), a <code>refresh_token</code>, their lifetimes in seconds and the user. Send the access token as <code>Authorization: Bearer &lt;token&gt;</code>.</p>
+<p>After <strong>5 wrong passwords</strong> the account is locked for <strong>5 minutes</strong>. A locked sign-in answers <code>429 too_many_attempts</code> with a <code>Retry-After</code> header in seconds.</p>
+<p><code>POST /auth/register</code> creates a customer account and signs it in. Passwords need at least 8 characters, a digit and an uppercase letter.</p>
+<h2>One-time codes</h2>
+<p><code>POST /auth/otp/request</code> with <code>{"channel": "email" | "sms", "destination"}</code> sends a 6-digit code that lives for 5 minutes. A new code can be requested every 30 seconds. <code>POST /auth/otp/verify</code> with <code>{"destination", "code"}</code> signs in. Five wrong codes kill the code. In this test system codes are delivered to the <a href="/docs/testing">demo inbox</a>.</p>
+<h2>Renewing access</h2>
+<p>Access tokens live 15 minutes by default (a tester can set this to 60 seconds). <code>POST /auth/refresh</code> with <code>{"refresh_token"}</code> returns a <strong>new</strong> access token and a <strong>new</strong> refresh token. The old refresh token stops working at once.</p>
+<p class="note">Presenting a refresh token that was already used is treated as theft: the whole sign-in ends and every token from it stops working (<code>401 refresh_reused</code>). The user must sign in again.</p>
+<h2>Signing out</h2>
+<p><code>POST /auth/logout</code> ends the current sign-in. <code>{"all_sessions": true}</code> ends every sign-in of the user. Ended tokens are refused on the very next request with <code>401 session_ended</code>.</p>
+<h2>OAuth 2.0 with PKCE</h2>
+<p>Authorization code flow. Only <code>S256</code> PKCE is accepted.</p>
+<ol>
+<li>Send the browser to <code>GET /oauth/authorize?response_type=code&amp;client_id=…&amp;redirect_uri=…&amp;code_challenge=…&amp;code_challenge_method=S256&amp;state=…</code>.</li>
+<li>The user signs in on that page and is redirected back with <code>?code=…&amp;state=…</code>. Codes live 10 minutes and work once.</li>
+<li>Exchange it at <code>POST /oauth/token</code> (form-encoded or JSON) with <code>grant_type=authorization_code</code>, <code>code</code>, <code>redirect_uri</code>, <code>code_verifier</code> and the client credentials (HTTP Basic or <code>client_id</code>/<code>client_secret</code> fields).</li>
+<li>Renew with <code>grant_type=refresh_token</code> at the same endpoint. Rotation and reuse detection work as above.</li>
+</ol>
+<p>The token endpoint answers errors in the OAuth format: <code>{"error": "invalid_grant", "error_description": "…"}</code>.</p>
+<h2>API keys</h2>
+<p>A fixed key, sent on every call as <code>X-API-Key: phk_test_…</code>, as <code>Authorization: Bearer phk_test_…</code>, or as the <code>api_key</code> query parameter. Create keys with <code>POST /me/api-keys</code>; the full key is shown once. Revoke with <code>DELETE /me/api-keys/{id}</code>.</p>
+<h2>Session cookie</h2>
+<p><code>POST /auth/session</code> with email and password sets an HTTP-only <code>pharm_session</code> cookie instead of returning a token. Every endpoint accepts the cookie. <code>DELETE /auth/session</code> ends it.</p>
+<h2>Signed requests (partners)</h2>
+<p>The <code>/partner/*</code> endpoints are for wholesale partners and take no user credential. Each request carries:</p>
+<table><tr><th>Header</th><th>Value</th></tr>
+<tr><td><code>X-Client-Id</code></td><td>The partner id, for example <code>partner-demo</code>.</td></tr>
+<tr><td><code>X-Timestamp</code></td><td>Current time in unix seconds. Must be within 5 minutes of the server clock.</td></tr>
+<tr><td><code>X-Signature</code></td><td>Hex HMAC-SHA256, keyed with the partner secret, of the string below.</td></tr></table>
+<pre><code>&lt;X-Timestamp&gt; + "\n" + &lt;METHOD&gt; + "\n" + &lt;path with query&gt; + "\n" + hex(sha256(body))</code></pre>
+<p>For a GET the body is empty, so the last line is the SHA-256 of nothing: <code>e3b0c442…b855</code>.</p>
+<h2>Who am I</h2>
+<p><code>GET /me</code> returns the signed-in user, their role and how they signed in. It is the best first call after any sign-in.</p>

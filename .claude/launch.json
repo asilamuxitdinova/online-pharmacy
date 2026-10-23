@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "make",
+      "runtimeArgs": ["-C", "backend", "dev", "ADDR=127.0.0.1:8090"],
+      "port": 8090
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["PHARMACY_API=http://127.0.0.1:8090", "npm", "--prefix", "frontend", "run", "dev"],
+      "port": 5173
+    }
+  ]
+}

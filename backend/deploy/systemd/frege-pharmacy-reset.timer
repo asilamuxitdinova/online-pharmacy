@@ -1,0 +1,9 @@
+[Unit]
+Description=Reset the Test Pharmacy every night, so each day's demos start clean
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

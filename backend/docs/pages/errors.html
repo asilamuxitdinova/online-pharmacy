@@ -1,0 +1,30 @@
+<h1>Error codes</h1>
+<p>Every error has the same shape:</p>
+<pre><code>{"error": {"status": 422, "code": "validation_failed", "message": "…",
+           "fields": [{"field": "items[0].quantity", "code": "out_of_range", "message": "must be between 1 and 10"}],
+           "required_role": "staff", "retry_after": 30, "details": {…}, "request_id": "req_…"}}</code></pre>
+<p><code>code</code> is stable; <code>message</code> is for people and follows the request's locale where a translation exists.</p>
+<table><tr><th>Status</th><th>Code</th><th>What to do</th></tr>
+<tr><td>400</td><td><code>invalid_json</code></td><td>The body is not valid JSON. Fix the syntax.</td></tr>
+<tr><td>400</td><td><code>unknown_field</code></td><td>A field the API does not know (named in <code>details.field</code>). Remove it.</td></tr>
+<tr><td>401</td><td><code>token_missing</code></td><td>Send a credential.</td></tr>
+<tr><td>401</td><td><code>token_invalid</code></td><td>The credential is malformed or signed with the wrong key. Sign in again.</td></tr>
+<tr><td>401</td><td><code>token_expired</code></td><td>Renew with the refresh token.</td></tr>
+<tr><td>401</td><td><code>session_ended</code></td><td>The sign-in was ended (sign-out, reuse detection, account deleted). Sign in again. <code>details.reason</code> says why.</td></tr>
+<tr><td>401</td><td><code>refresh_reused</code></td><td>A spent refresh token was replayed; the whole sign-in ended. Sign in again.</td></tr>
+<tr><td>401</td><td><code>invalid_credentials</code></td><td>Wrong email or password. <code>details.attempts_left</code> counts down.</td></tr>
+<tr><td>401</td><td><code>code_invalid</code>, <code>code_expired</code></td><td>Wrong or old one-time code. Ask for a new one.</td></tr>
+<tr><td>401</td><td><code>signature_invalid</code>, <code>signature_expired</code></td><td>Recompute the partner signature; check the clock.</td></tr>
+<tr><td>402</td><td><code>card_declined</code>, <code>insufficient_funds</code>, <code>card_expired</code></td><td>Payment refused; nothing was charged. Try another card.</td></tr>
+<tr><td>403</td><td><code>role_required</code></td><td>The caller's role is too low; <code>required_role</code> names the one needed. Do not retry.</td></tr>
+<tr><td>403</td><td><code>account_disabled</code></td><td>An administrator disabled the account. Do not retry.</td></tr>
+<tr><td>403</td><td><code>act_as_required</code></td><td>Staff must send <code>X-Act-As</code> to change a customer's order.</td></tr>
+<tr><td>404</td><td><code>*_not_found</code></td><td>No such record, or it belongs to someone else.</td></tr>
+<tr><td>409</td><td><code>order_already_paid</code>, <code>order_paid</code>, <code>order_not_editable</code>, <code>order_cancelled</code></td><td>The order's state does not allow this action. <code>details.status</code> gives the state.</td></tr>
+<tr><td>409</td><td><code>insufficient_stock</code></td><td>Lower the quantity to <code>details.available</code> or pick another product.</td></tr>
+<tr><td>409</td><td><code>refund_already_decided</code>, <code>prescription_already_reviewed</code></td><td>Someone already decided.</td></tr>
+<tr><td>422</td><td><code>validation_failed</code></td><td>Fix every field in <code>fields</code> at once, then retry.</td></tr>
+<tr><td>422</td><td><code>idempotency_key_reused</code></td><td>Use a new <code>Idempotency-Key</code> for a different request.</td></tr>
+<tr><td>429</td><td><code>too_many_attempts</code></td><td>Wait <code>Retry-After</code> seconds before trying again.</td></tr>
+<tr><td>500</td><td><code>internal_error</code></td><td>A bug on our side. Report the <code>request_id</code>.</td></tr>
+<tr><td>503</td><td><code>simulated_failure</code></td><td>Only from <code>/_test/fail</code>. Retry after <code>Retry-After</code>.</td></tr></table>

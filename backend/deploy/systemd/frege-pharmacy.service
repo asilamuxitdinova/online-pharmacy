@@ -1,0 +1,39 @@
+[Unit]
+Description=Test Pharmacy API (a target for testing Frege)
+Documentation=https://pharmacy.example.test/docs/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=frege-pharmacy
+Group=frege-pharmacy
+EnvironmentFile=/etc/frege-pharmacy/pharmacy.env
+WorkingDirectory=/var/lib/frege-pharmacy
+StateDirectory=frege-pharmacy
+StateDirectoryMode=0750
+ExecStartPre=/usr/local/bin/frege-pharmacy migrate
+ExecStart=/usr/local/bin/frege-pharmacy serve
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+
+# Hardening: the service only needs its state directory and the network.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

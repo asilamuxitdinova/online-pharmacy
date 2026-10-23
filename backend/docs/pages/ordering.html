@@ -1,0 +1,17 @@
+<h1>Ordering</h1>
+<p>An order holds 1 to 20 different products, at most 10 of each. Prices are fixed when the order is created.</p>
+<h2>Life of an order</h2>
+<table><tr><th>Status</th><th>Meaning</th><th>What can happen next</th></tr>
+<tr><td><code>pending_payment</code></td><td>Created, not paid.</td><td>Change (PUT, PATCH), pay, cancel or delete.</td></tr>
+<tr><td><code>paid</code></td><td>Paid in full.</td><td>Refund. A paid order cannot be cancelled, changed or deleted.</td></tr>
+<tr><td><code>partially_refunded</code></td><td>Some money returned.</td><td>Further refunds up to the amount left.</td></tr>
+<tr><td><code>refunded</code></td><td>All money returned.</td><td>Nothing.</td></tr>
+<tr><td><code>cancelled</code></td><td>Cancelled before payment.</td><td>Delete.</td></tr></table>
+<h2>Changing an order</h2>
+<p><code>PUT /orders/{id}</code> replaces the whole order, items included: send every field. <code>PATCH /orders/{id}</code> changes only delivery details (delivery method, address, prescription, note) and leaves the items alone.</p>
+<h2>Safe retries</h2>
+<p><code>POST /orders</code>, <code>POST /orders/{id}/pay</code> and <code>POST /orders/{id}/refunds</code> accept an <code>Idempotency-Key</code> header. Repeating a request with the same key and body returns the first answer (with <code>Idempotent-Replayed: true</code>) instead of acting twice. The same key with a different body is refused with <code>422 idempotency_key_reused</code>.</p>
+<h2>Stock</h2>
+<p>Stock is checked when an order is created and taken when it is paid. If a product sells out in between, payment answers <code>409 insufficient_stock</code>. The slow <code>POST /stock-checks</code> job checks every branch.</p>
+<h2>Invoices</h2>
+<p><code>GET /orders/{id}/invoice</code> returns a printable HTML page, not JSON.</p>

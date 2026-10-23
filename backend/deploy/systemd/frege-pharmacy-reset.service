@@ -1,0 +1,16 @@
+[Unit]
+Description=Reset the Test Pharmacy data to the seeded demo state
+After=frege-pharmacy.service
+
+[Service]
+Type=oneshot
+User=frege-pharmacy
+Group=frege-pharmacy
+EnvironmentFile=/etc/frege-pharmacy/pharmacy.env
+WorkingDirectory=/var/lib/frege-pharmacy
+ExecStart=/usr/local/bin/frege-pharmacy reset
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/frege-pharmacy
+ProtectHome=true
+PrivateTmp=true

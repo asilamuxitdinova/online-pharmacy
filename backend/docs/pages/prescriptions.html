@@ -1,0 +1,9 @@
+<h1>Prescriptions</h1>
+<p>Some medicines (antibiotics, blood pressure and diabetes medicine, strong painkillers) need a prescription. In the catalog they have <code>"requires_prescription": true</code>.</p>
+<ol>
+<li>Upload the prescription details with <code>POST /prescriptions</code>: doctor, clinic, date issued and diagnosis.</li>
+<li>A pharmacist reviews it (<code>pending_review</code> → <code>approved</code> or <code>rejected</code>), usually within 2 working hours.</li>
+<li>Give the approved prescription's id as <code>prescription_id</code> when you order.</li>
+</ol>
+<p>A prescription is valid for <strong>one year</strong> from the day it was issued and cannot be dated in the future. A rejection always comes with a note explaining why.</p>
+<p class="note">Diagnoses are medical information. Staff see them; nobody else does.</p>

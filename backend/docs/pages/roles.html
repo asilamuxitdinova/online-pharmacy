@@ -1,0 +1,18 @@
+<h1>Roles</h1>
+<p>There are three roles. Each includes everything the roles above it in this table can do.</p>
+<table><tr><th>Role</th><th>Who</th><th>May</th></tr>
+<tr><td>(none)</td><td>Anyone</td><td>Browse the catalog and categories, read these docs, check health.</td></tr>
+<tr><td><code>customer</code></td><td>People buying medicine</td><td>Manage their own profile, addresses, cards, prescriptions, orders and refunds.</td></tr>
+<tr><td><code>staff</code></td><td>Pharmacists</td><td>Read every order and customer (including taxpayer numbers), review prescriptions, approve or reject refunds, run sales reports, act on a customer's behalf.</td></tr>
+<tr><td><code>admin</code></td><td>Administrators</td><td>List all users, change roles, disable, enable and delete accounts.</td></tr></table>
+<h2>Rules</h2>
+<ul>
+<li>The role is checked on <strong>every request</strong> from the database. A role change takes effect on the very next call; there is no need to sign in again.</li>
+<li>Someone else's record answers <code>404</code>, not <code>403</code>, so the API never confirms that it exists.</li>
+<li>A <code>403 role_required</code> names the role that was needed in <code>required_role</code>.</li>
+<li>A disabled account gets <code>403 account_disabled</code> on every call.</li>
+<li>Administrators cannot change, disable or delete their own account.</li>
+</ul>
+<h2>Acting on a customer's behalf</h2>
+<p>Staff and admins may send <code>X-Act-As: &lt;customer id&gt;</code> to see exactly what that customer sees and to change their orders. Staff-only endpoints refuse a request that carries <code>X-Act-As</code>. Responses made this way carry an <code>X-Acting-As</code> header.</p>
+<p>Without <code>X-Act-As</code>, staff can read any order but cannot change it (<code>403 act_as_required</code>).</p>
