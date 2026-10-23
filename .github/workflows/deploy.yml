@@ -1,0 +1,151 @@
+name: Deploy
+
+# Deploys main to pharmacy.sukoon.uz. Nothing deploys from dev.
+#
+# Needs, in the "production" environment (Settings → Environments):
+#   secrets  DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS
+#   vars     DEPLOY_PORT (default 22), HEALTH_URL (default http://127.0.0.1:8080/health),
+#            PUBLIC_SITE (default https://pharmacy.sukoon.uz)
+# Optional repository variable VITE_OAUTH_CLIENT_SECRET (it ends up in public
+# JavaScript, so it is a variable, not a secret). See deploy/README.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build release
+    needs: ci
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.name.outputs.release }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: name
+        run: echo "release=$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Backend binary (linux/amd64, static)
+        run: make -C backend build VERSION=${{ steps.name.outputs.release }}
+        env:
+          GOOS: linux
+          GOARCH: amd64
+
+      - name: Frontend
+        run: make -C frontend build
+        env:
+          VITE_OAUTH_CLIENT_SECRET: ${{ vars.VITE_OAUTH_CLIENT_SECRET }}
+
+      - name: Package
+        run: |
+          mkdir -p release
+          cp backend/bin/frege-pharmacy release/
+          cp -r frontend/dist release/web
+          echo "${{ steps.name.outputs.release }}" > release/VERSION
+          tar -C release -czf frege-pharmacy-${{ steps.name.outputs.release }}.tar.gz .
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: frege-pharmacy-*.tar.gz
+          retention-days: 30
+
+  deploy:
+    name: Deploy to server
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.PUBLIC_SITE || 'https://pharmacy.sukoon.uz' }}
+    env:
+      RELEASE: ${{ needs.build.outputs.release }}
+      PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      SITE: ${{ vars.PUBLIC_SITE || 'https://pharmacy.sukoon.uz' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: deploy
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: release
+
+      - name: Check the deploy secrets are set
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER_: ${{ secrets.DEPLOY_USER }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          missing=""
+          [ -n "$HOST" ]  || missing="$missing DEPLOY_HOST"
+          [ -n "$USER_" ] || missing="$missing DEPLOY_USER"
+          [ -n "$KEY" ]   || missing="$missing DEPLOY_SSH_KEY"
+          [ -n "$KNOWN" ] || missing="$missing DEPLOY_KNOWN_HOSTS"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing secrets in the production environment:$missing (see deploy/README.md)"
+            exit 1
+          fi
+
+      - name: SSH setup
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Pinned host key: the connection fails rather than trusting a new one.
+          printf '%s\n' "$KNOWN" > ~/.ssh/known_hosts
+
+      - name: Upload and switch release
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER_: ${{ secrets.DEPLOY_USER }}
+          HEALTH_URL: ${{ vars.HEALTH_URL || 'http://127.0.0.1:8080/health' }}
+        run: |
+          ssh_opts=(-i ~/.ssh/deploy_key -p "$PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes)
+          incoming="frege-pharmacy-incoming"
+          ssh "${ssh_opts[@]}" "$USER_@$HOST" "mkdir -p ~/$incoming"
+          scp -P "$PORT" -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            "frege-pharmacy-$RELEASE.tar.gz" deploy/remote-deploy.sh "$USER_@$HOST:$incoming/"
+          ssh "${ssh_opts[@]}" "$USER_@$HOST" \
+            "bash ~/$incoming/remote-deploy.sh ~/$incoming/frege-pharmacy-$RELEASE.tar.gz '$RELEASE' '$HEALTH_URL'"
+
+      - name: Smoke test through the public address
+        run: |
+          for i in $(seq 1 10); do
+            if curl -fsS "$SITE/api/health" | tee /dev/stderr | grep -q "\"$RELEASE\""; then ok=1; break; fi
+            sleep 3
+          done
+          [ "${ok:-}" = 1 ] || { echo "::error::$SITE/api/health does not report $RELEASE"; exit 1; }
+          curl -fsS -o /dev/null "$SITE/"
+          curl -fsS "$SITE/openapi.yaml" | grep -q "url: $SITE/api" || { echo "::error::the served spec does not point at $SITE/api (check PUBLIC_URL)"; exit 1; }
+          echo "Deployed $RELEASE to $SITE"
+
+      - name: Remove the key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

@@ -66,7 +66,10 @@ func (s *Server) verifySignature(r *http.Request) *apiError {
 		return errf(http.StatusBadRequest, "invalid_body", "The request body could not be read.")
 	}
 	r.Body = io.NopCloser(bytes.NewReader(body))
-	want := SignRequest(s.cfg.PartnerSecret, stamp, r.Method, r.URL.RequestURI(), body)
+	// Behind a proxy that strips a path prefix (Caddy's handle_path /api/*),
+	// the client signed the path it sent, prefix included.
+	uri := strings.TrimRight(r.Header.Get("X-Forwarded-Prefix"), "/") + r.URL.RequestURI()
+	want := SignRequest(s.cfg.PartnerSecret, stamp, r.Method, uri, body)
 	if !hmac.Equal([]byte(want), []byte(strings.ToLower(sig))) {
 		return errf(http.StatusUnauthorized, "signature_invalid", "X-Signature does not match. See /docs/authentication for the exact string to sign.")
 	}

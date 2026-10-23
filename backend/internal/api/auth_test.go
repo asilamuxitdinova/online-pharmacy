@@ -324,6 +324,10 @@ func TestSignedPartnerRequests(t *testing.T) {
 	body := `{"sku":"PH-0017","quantity":5}`
 	sig = SignRequest("partner-secret", stamp, "POST", "/partner/restock", []byte(body))
 	e.call("POST", "/partner/restock", body, "X-Client-Id", "partner-demo", "X-Timestamp", stamp, "X-Signature", sig).expect(200)
+	// Behind the /api proxy the client signs the path it sent, prefix included.
+	proxied := SignRequest("partner-secret", stamp, "GET", "/api"+path, nil)
+	e.call("GET", path, nil, "X-Client-Id", "partner-demo", "X-Timestamp", stamp, "X-Signature", proxied, "X-Forwarded-Prefix", "/api").expect(200)
+
 	// The body is part of the signature.
 	e.call("POST", "/partner/restock", `{"sku":"PH-0017","quantity":500}`, "X-Client-Id", "partner-demo", "X-Timestamp", stamp, "X-Signature", sig).
 		expectErr(401, "signature_invalid")

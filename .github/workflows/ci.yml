@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  # Pushes to main run CI through the deploy workflow, so only dev is listed here.
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev, main]
+  # The deploy workflow runs this first and deploys only if it passes.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  # github.workflow is the caller's name when Deploy calls this, so the two never cancel each other.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  backend:
+    name: Backend (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: gofmt and vet
+        run: make lint
+
+      - name: Tests (race detector)
+        run: make test-race
+
+      - name: Build
+        run: make build
+
+  frontend:
+    name: Frontend (TypeScript)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Typecheck and build
+        run: make check
+
+  deploy-files:
+    name: Deploy files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: shellcheck
+        run: shellcheck deploy/*.sh
+
+      - name: systemd units
+        run: |
+          # The binary is not installed on the runner; ignore only that complaint.
+          out=$(systemd-analyze verify backend/deploy/systemd/*.service backend/deploy/systemd/*.timer 2>&1 | grep -v 'is not executable' || true)
+          if [ -n "$out" ]; then echo "$out"; exit 1; fi
