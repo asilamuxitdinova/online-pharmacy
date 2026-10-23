@@ -21,7 +21,6 @@ export default function Staff() {
     <Page>
       <div className="stack" style={{ '--gap': '24px' } as React.CSSProperties}>
         <div className="stack" style={{ '--gap': '6px' } as React.CSSProperties}>
-          <span className="kicker">role: staff</span>
           <h1 style={{ fontSize: 'clamp(36px, 5vw, 60px)' }}>{t('nav.staff')}</h1>
         </div>
         <Tabs<Tab>
@@ -266,7 +265,7 @@ function Customers() {
                 nav('/account')
               }}
             >
-              See what {detail.data.name.split(' ')[0]} sees <span className="tiny mono">X-Act-As</span>
+              View as {detail.data.name.split(' ')[0]}
             </button>
           </>
         )}
@@ -299,7 +298,7 @@ function Report() {
     <div className="grid-2">
       <div className="card stack" style={{ '--gap': '14px' } as React.CSSProperties}>
         <h3>Sales report</h3>
-        <p className="small muted">A slow job: 202 Accepted, then poll until it is done. An assistant must not report numbers before it finishes.</p>
+        <p className="small muted">Paid orders, revenue and refunds for the chosen dates. Large ranges take a few seconds.</p>
         <div className="row" style={{ flexWrap: 'nowrap' }}>
           <Field label="From" error={error?.fieldError('from')}><input type="date" className="input" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
           <Field label="To" error={error?.fieldError('to')}><input type="date" className="input" value={to} onChange={(e) => setTo(e.target.value)} /></Field>

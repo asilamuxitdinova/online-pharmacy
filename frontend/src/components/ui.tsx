@@ -9,21 +9,14 @@ export function ErrorNote({ error, onRetry }: { error?: ApiError | null; onRetry
   if (!error) return null
   const b = error.body
   return (
-    <motion.div className="error-note" role="alert" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="spread">
-        <span>{b.message}</span>
-        <span className="code">
-          {b.status ? `${b.status} · ` : ''}
-          {b.code}
-        </span>
-      </div>
-      {b.required_role && <div className="small">Needs the {b.required_role} role.</div>}
+    <motion.div className="error-note" role="alert" title={b.request_id ? `${b.code} · ${b.request_id}` : b.code} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
+      <div>{b.message}</div>
       {b.retry_after ? <div className="small">Try again in {b.retry_after}s.</div> : null}
       {b.fields && b.fields.length > 0 && (
         <ul>
           {b.fields.map((f) => (
             <li key={f.field + f.code}>
-              <code>{f.field}</code> {f.message}
+              {fieldLabel(f.field)} {f.message}
             </li>
           ))}
         </ul>
@@ -35,6 +28,12 @@ export function ErrorNote({ error, onRetry }: { error?: ApiError | null; onRetry
       )}
     </motion.div>
   )
+}
+
+// "items[0].quantity" → "Item 1 quantity": readable, still precise.
+function fieldLabel(field: string) {
+  const s = field.replace(/^card\./, 'card ').replace(/\[(\d+)\]/g, (_, i) => ` ${Number(i) + 1}`).replace(/[._]/g, ' ').trim()
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 const tone: Record<string, string> = {

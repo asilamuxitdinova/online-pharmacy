@@ -11,8 +11,6 @@ interface Auth {
   setAutoRenew: (v: boolean) => void
   is: (role: Role) => boolean
   adoptTokens: (t: TokenSet, via: string) => Promise<void>
-  signInWithCookie: (email: string, password: string) => Promise<void>
-  signInWithApiKey: (key: string) => Promise<void>
   signOut: (everywhere?: boolean) => Promise<void>
   actAs: (customerId: string | null) => void
   refreshMe: () => Promise<void>
@@ -62,22 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     activity.push('signed_in', `Signed in as ${t.user.email} via ${via}`)
   }
 
-  const signInWithCookie = async (email: string, password: string) => {
-    const r = await post<{ session_id: string; user: { email: string } }>('/auth/session', { email, password }, { anonymous: true })
-    session.set({ kind: 'cookie', sessionId: r.session_id })
-    activity.push('signed_in', `Signed in as ${r.user.email} with a session cookie`)
-  }
 
-  const signInWithApiKey = async (key: string) => {
-    session.set({ kind: 'apikey', key })
-    try {
-      await get<Me>('/me')
-      activity.push('signed_in', `Using API key ${key.slice(0, 12)}…`)
-    } catch (e) {
-      session.set(null)
-      throw e
-    }
-  }
 
   const signOut = async (everywhere = false) => {
     try {
@@ -98,8 +81,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAutoRenew,
     is: (role) => !!me && rank[(me.actor?.role ?? me.role) as Role] >= rank[role],
     adoptTokens,
-    signInWithCookie,
-    signInWithApiKey,
     signOut,
     actAs: (id) => session.setActAs(id),
     refreshMe,

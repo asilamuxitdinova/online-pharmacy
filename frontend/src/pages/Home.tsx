@@ -119,13 +119,10 @@ export default function Home() {
             <Link to="/shop" className="btn coral">
               {t('hero.cta')} →
             </Link>
-            <Link to="/lab" className="btn ghost">
-              ⚗ {t('hero.lab')}
-            </Link>
+            <a href="/docs/" className="btn ghost">
+              {t('hero.policies')}
+            </a>
           </motion.div>
-          <motion.p className="tiny muted" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }}>
-            Psst, click a pill.
-          </motion.p>
         </div>
       </section>
 
@@ -191,16 +188,16 @@ export default function Home() {
               <span style={{ opacity: 0.7 }}>{t('rule.refund')}</span>
             </div>
             <div className="stat">
-              <CountUp to={5} />
-              <span style={{ opacity: 0.7 }}>{t('rule.lockout')}</span>
+              <CountUp to={8} />
+              <span style={{ opacity: 0.7 }}>{t('rule.cities')}</span>
             </div>
             <div className="stat">
-              <CountUp to={5} />
-              <span style={{ opacity: 0.7 }}>{t('rule.otp')}</span>
+              <CountUp to={16} format={(n) => `${Math.round(n)}:00`} />
+              <span style={{ opacity: 0.7 }}>{t('rule.sameDay')}</span>
             </div>
           </div>
-          <a href="/docs/refunds" className="small" style={{ opacity: 0.8 }}>
-            Read the full policies →
+          <a href="/docs/" className="small" style={{ opacity: 0.8 }}>
+            {t('hero.policies')} →
           </a>
         </div>
       </section>

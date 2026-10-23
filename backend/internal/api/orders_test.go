@@ -394,7 +394,7 @@ func TestErrorMessagesFollowLocale(t *testing.T) {
 
 func TestDocs(t *testing.T) {
 	e := newEnv(t)
-	for _, page := range []string{"/docs/", "/docs/refunds", "/docs/errors", "/docs/testing"} {
+	for _, page := range []string{"/docs/", "/docs/refunds", "/docs/errors", "/docs/payments"} {
 		r := e.call("GET", page, nil).expect(200)
 		if !strings.HasPrefix(r.Header.Get("Content-Type"), "text/html") {
 			t.Fatalf("%s: %s", page, r.Header.Get("Content-Type"))
@@ -405,6 +405,9 @@ func TestDocs(t *testing.T) {
 	}
 	e.call("GET", "/docs/nope", nil).expectErr(404, "page_not_found")
 	spec := e.call("GET", "/openapi.yaml", nil).expect(200)
+	if strings.Contains(strings.ToLower(string(spec.Raw)), "frege") {
+		t.Fatal("the public spec must not mention the client it was written for")
+	}
 	if !strings.Contains(string(spec.Raw), "https://pharmacy.test.local") || strings.Contains(string(spec.Raw), "pharmacy.example.test") {
 		t.Fatal("the served spec should carry PUBLIC_URL as its only server")
 	}

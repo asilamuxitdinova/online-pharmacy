@@ -34,8 +34,6 @@ Create an environment named **production** (Settings → Environments). Optional
 | variable | `DEPLOY_PORT` | SSH port, if not 22 |
 | variable | `HEALTH_URL` | if `ADDR` is not `127.0.0.1:8090`: `http://127.0.0.1:<port>/health` |
 
-Repository variable (optional): `VITE_OAUTH_CLIENT_SECRET`. It's the OAuth test client's secret, baked into the frontend so the browser can do the OAuth demo. It becomes public, so use a value meant only for testing.
-
 ## One-time server setup
 
 Done by hand, once, before the first deploy. The full steps come when we configure the server. In outline:

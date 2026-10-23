@@ -23,7 +23,6 @@ export default function Product() {
   const [qty, setQty] = useState(1)
   const [jobLoc, setJobLoc] = useState<string | null>(null)
   const [jobErr, setJobErr] = useState<ApiError | null>(null)
-  const [simulateFailure, setSimulateFailure] = useState(false)
   const res = useAsync((signal) => get<P>(`/products/${id}`, undefined, { signal }), [id, lang])
   const { job, error } = useJob(jobLoc)
 
@@ -41,7 +40,7 @@ export default function Product() {
     setJobErr(null)
     setJobLoc(null)
     try {
-      const j = await post<Job>('/stock-checks', { product_id: id, simulate_failure: simulateFailure })
+      const j = await post<Job>('/stock-checks', { product_id: id })
       setJobLoc(`/jobs/${j.id}`)
     } catch (e) {
       setJobErr(e as ApiError)
@@ -134,25 +133,16 @@ export default function Product() {
               </table>
 
               <div className="card stack" style={{ '--gap': '14px' } as React.CSSProperties}>
-                <div className="spread">
-                  <h3>{t('product.stockCheck')}</h3>
-                  <span className="badge plain mono">POST /stock-checks → 202</span>
-                </div>
+                <h3>{t('product.stockCheck')}</h3>
                 <p className="small muted">{t('product.stockCheckHint')}</p>
                 <BranchMap progress={job?.progress ?? 0} branches={stock?.branches} />
                 {me ? (
-                  <div className="row">
-                    <button className="btn mint sm" onClick={startCheck} disabled={job?.status === 'running'}>
-                      {job?.status === 'running' ? 'Checking…' : 'Start check'}
-                    </button>
-                    <label className="check small">
-                      <input type="checkbox" checked={simulateFailure} onChange={(e) => setSimulateFailure(e.target.checked)} />
-                      make it fail
-                    </label>
-                  </div>
+                  <button className="btn mint sm" style={{ width: 'fit-content' }} onClick={startCheck} disabled={job?.status === 'running'}>
+                    {job?.status === 'running' ? 'Checking…' : 'Check branches'}
+                  </button>
                 ) : (
                   <Link to="/login" className="btn sm ghost">
-                    Sign in to run a stock check
+                    Sign in to check branches
                   </Link>
                 )}
                 <ErrorNote error={jobErr} />

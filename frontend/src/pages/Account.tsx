@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { brandOf, formatCardNumber, PaymentCard, TEST_CARDS } from '../components/PaymentCard'
+import { brandOf, formatCardNumber, PaymentCard } from '../components/PaymentCard'
 import { PillIcon } from '../components/PillIcon'
 import { Empty, ErrorNote, Field, Loading, Page, StatusBadge, Tabs } from '../components/ui'
 import { ApiError, del, get, patch, post } from '../lib/api'
@@ -137,7 +137,7 @@ function Orders() {
       </div>
       {more && (
         <button className="btn ghost" style={{ alignSelf: 'center' }} onClick={loadMore} disabled={loadingMore}>
-          {loadingMore ? '…' : 'Load more'} <span className="mono tiny muted">?cursor=</span>
+          {loadingMore ? '…' : 'Load more'}
         </button>
       )}
     </div>
@@ -208,7 +208,7 @@ function Prescriptions() {
         <Field label="Issued on" error={error?.fieldError('issued_on')} hint="Valid for one year, never in the future.">
           <input className="input" type="date" value={f.issued_on} onChange={(e) => setF({ ...f, issued_on: e.target.value })} />
         </Field>
-        <Field label="Diagnosis (made up, please)" error={error?.fieldError('diagnosis')}>
+        <Field label="Diagnosis" error={error?.fieldError('diagnosis')}>
           <textarea className="textarea" value={f.diagnosis} onChange={(e) => setF({ ...f, diagnosis: e.target.value })} />
         </Field>
         <ErrorNote error={error && !error.body.fields ? error : null} />
@@ -290,13 +290,6 @@ function Cards() {
       <form className="card stack sticky" style={{ '--gap': '14px' } as React.CSSProperties} onSubmit={add}>
         <h3>Add a card</h3>
         <PaymentCard number={f.number} name="" exp={f.exp} cvc={f.cvc} flipped={flip} />
-        <div className="row" style={{ '--gap': '6px' } as React.CSSProperties}>
-          {TEST_CARDS.slice(0, 4).map((c) => (
-            <button type="button" key={c.number} className="chip" style={{ height: 26, fontSize: 11 }} onClick={() => setF({ number: c.number, exp: '12/30', cvc: '123' })}>
-              {c.label}
-            </button>
-          ))}
-        </div>
         <Field label={`Number ${brandOf(f.number) ? '· ' + brandOf(f.number) : ''}`} error={error?.fieldError('number')}>
           <input className="input mono" value={f.number} onChange={(e) => setF({ ...f, number: formatCardNumber(e.target.value) })} />
         </Field>
@@ -347,9 +340,7 @@ function Addresses() {
                 <div className="small">
                   {a.line1}, {a.city}
                 </div>
-                <div className="tiny muted mono">
-                  {a.phone} · {a.id}
-                </div>
+                <div className="tiny muted">{a.phone}</div>
               </div>
               <button
                 className="btn ghost sm"
@@ -455,7 +446,7 @@ function Keys() {
       <form className="card stack sticky" style={{ '--gap': '12px' } as React.CSSProperties} onSubmit={create}>
         <h3>New key</h3>
         <Field label="What is it for?" error={error?.fieldError('name')}>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Frege test run" />
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="My integration" />
         </Field>
         <button className="btn coral">Create</button>
         <AnimatePresence>
@@ -508,19 +499,11 @@ function Profile() {
         <button className="btn coral">Save</button>
       </form>
       <div className="card stack" style={{ '--gap': '12px' } as React.CSSProperties}>
-        <h3>This sign-in</h3>
-        <table className="grid">
-          <tbody>
-            <tr><td className="muted">User</td><td className="mono">{me.id}</td></tr>
-            <tr><td className="muted">Role</td><td><span className="badge plain">{me.role}</span></td></tr>
-            <tr><td className="muted">Method</td><td className="mono">{me.auth_method}{creds?.kind === 'token' ? ` · ${creds.via}` : ''}</td></tr>
-            <tr><td className="muted">Session</td><td className="mono">{me.session_id ?? '—'}</td></tr>
-          </tbody>
-        </table>
+        <h3>Security</h3>
+        <p className="small muted">Signed in as {me.email}. Signing out everywhere ends your sessions on every device.</p>
         <div className="row">
           <button className="btn ghost sm" onClick={() => void signOut(false)}>Sign out</button>
           <button className="btn danger sm" onClick={() => void signOut(true)} disabled={creds?.kind === 'cookie'}>Sign out everywhere</button>
-          <Link to="/lab" className="btn ghost sm">Watch the token in the Lab →</Link>
         </div>
       </div>
     </div>

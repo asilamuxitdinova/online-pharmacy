@@ -58,7 +58,7 @@ func Load() (Config, error) {
 
 		FixedOTPCode: env("FIXED_OTP_CODE", ""),
 
-		OAuthClientID:     env("OAUTH_CLIENT_ID", "frege-test"),
+		OAuthClientID:     env("OAUTH_CLIENT_ID", "partner-app"),
 		OAuthClientSecret: env("OAUTH_CLIENT_SECRET", "dev-only-oauth-secret"),
 		OAuthRedirectURIs: envList("OAUTH_REDIRECT_URIS"),
 

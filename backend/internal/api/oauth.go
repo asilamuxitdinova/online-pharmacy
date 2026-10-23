@@ -21,7 +21,7 @@ import (
 
 var authorizePage = template.Must(template.New("authorize").Parse(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sign in · Test Pharmacy</title>
+<title>Sign in · Dorixona</title>
 <style>
 body{font-family:system-ui,sans-serif;background:#f4f7f6;margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center}
 form{background:#fff;padding:32px;border-radius:12px;box-shadow:0 2px 16px rgba(0,0,0,.08);width:min(360px,90vw)}
@@ -31,7 +31,7 @@ button{margin-top:20px;width:100%;padding:11px;border:0;border-radius:8px;backgr
 .err{background:#fde8e8;color:#9b1c1c;padding:10px;border-radius:8px;font-size:14px}
 </style></head><body>
 <form method="post" action="/oauth/authorize">
-<h1>Test Pharmacy</h1>
+<h1>Dorixona</h1>
 <p><strong>{{.ClientID}}</strong> wants to act on your behalf.</p>
 {{if .Error}}<div class="err">{{.Error}}</div>{{end}}
 <label for="email">Email</label><input id="email" name="email" type="email" autocomplete="username" value="{{.Email}}" required>

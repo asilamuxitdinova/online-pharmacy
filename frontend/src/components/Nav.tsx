@@ -32,7 +32,6 @@ export function Nav() {
     { to: '/account', label: t('nav.account'), show: !!me },
     { to: '/staff', label: t('nav.staff'), show: is('staff') && !actingAs },
     { to: '/admin', label: t('nav.admin'), show: is('admin') && !actingAs },
-    { to: '/lab', label: t('nav.lab'), show: true },
   ].filter((l) => l.show)
 
   const toggleTheme = () => {
@@ -127,7 +126,7 @@ export function Nav() {
         {actingAs && me && (
           <motion.div className="act-banner" initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }}>
             <span>
-              Acting as {me.name} · <span className="mono">X-Act-As</span>
+              Viewing as {me.name}
             </span>
             <button className="btn sm" onClick={() => actAs(null)}>
               Stop

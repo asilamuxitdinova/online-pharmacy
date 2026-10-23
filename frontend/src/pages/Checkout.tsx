@@ -2,7 +2,7 @@ import { AnimatePresence, motion, useAnimationControls } from 'motion/react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { DeliveryProgress } from '../components/CartDrawer'
-import { formatCardNumber, PaymentCard, TEST_CARDS } from '../components/PaymentCard'
+import { formatCardNumber, PaymentCard } from '../components/PaymentCard'
 import { PillIcon } from '../components/PillIcon'
 import { Empty, ErrorNote, Field, Page } from '../components/ui'
 import { ApiError, get, newIdempotencyKey, post } from '../lib/api'
@@ -14,7 +14,7 @@ import { useAsync } from '../lib/useAsync'
 
 export default function Checkout() {
   const cart = useCart()
-  const { t, lang } = useI18n()
+  const { t } = useI18n()
   const [order, setOrder] = useState<Order | null>(null)
   const [paid, setPaid] = useState(false)
 
@@ -33,7 +33,6 @@ export default function Checkout() {
   return (
     <Page>
       <div className="stack" style={{ '--gap': '8px', marginBottom: 24 } as React.CSSProperties}>
-        <span className="kicker">{order ? 'Step 2 · POST /orders/{id}/pay' : 'Step 1 · POST /orders'}</span>
         <h1 style={{ fontSize: 'clamp(36px, 5vw, 60px)' }}>{t('checkout.title')}</h1>
         <Steps step={order ? 2 : 1} />
       </div>
@@ -55,9 +54,6 @@ export default function Checkout() {
           </motion.div>
         )}
       </AnimatePresence>
-      <p className="tiny muted" style={{ marginTop: 24 }}>
-        {lang === 'en' ? 'Amounts in UZS.' : ''}
-      </p>
     </Page>
   )
 }
@@ -209,9 +205,6 @@ function PlaceOrder({ onPlaced }: { onPlaced: (o: Order) => void }) {
         <button className="btn coral" onClick={place} disabled={busy}>
           {busy ? '…' : t('checkout.place')}
         </button>
-        <span className="tiny muted mono" title="Retries with this key return the first answer">
-          Idempotency-Key: {idemKey.slice(0, 18)}…
-        </span>
       </aside>
     </div>
   )
@@ -280,23 +273,14 @@ export function Pay({ order, onPaid }: { order: Order; onPaid: (o: Order) => voi
                 <span className="muted small">
                   {String(c.exp_month).padStart(2, '0')}/{c.exp_year}
                 </span>
-                <span className="grow" />
-                <span className="tiny muted mono">{c.id}</span>
               </label>
             ))}
           </div>
         ) : (
           <div className="stack" style={{ '--gap': '16px' } as React.CSSProperties}>
             <PaymentCard number={number} name={name} exp={exp} cvc={cvc} flipped={flip} />
-            <div className="row" style={{ justifyContent: 'center', '--gap': '6px' } as React.CSSProperties}>
-              {TEST_CARDS.map((c) => (
-                <button key={c.number} className="chip" style={{ height: 28, fontSize: 12 }} onClick={() => { setNumber(c.number); setExp('12/30'); setCvc('123'); setName('Test Holder') }}>
-                  <span style={{ color: c.tone === 'ok' ? 'var(--mint-ink)' : 'var(--bad)' }}>●</span> {c.label}
-                </button>
-              ))}
-            </div>
             <Field label="Card number" error={error?.fieldError('card.number')}>
-              <input className="input mono" inputMode="numeric" autoComplete="off" value={number} onChange={(e) => setNumber(formatCardNumber(e.target.value))} placeholder="4242 4242 4242 4242" />
+              <input className="input mono" inputMode="numeric" autoComplete="off" value={number} onChange={(e) => setNumber(formatCardNumber(e.target.value))} placeholder="0000 0000 0000 0000" />
             </Field>
             <div className="grid-2" style={{ gap: 12 }}>
               <Field label="Name on card">
@@ -347,7 +331,7 @@ export function Pay({ order, onPaid }: { order: Order; onPaid: (o: Order) => voi
         <motion.button className="btn coral" onClick={pay} disabled={!confirmed || busy} whileTap={{ scale: 0.96 }}>
           {busy ? '…' : `${t('checkout.pay')} ${money(order.total, lang)}`}
         </motion.button>
-        <p className="tiny muted">Paying moves money, so it waits for your explicit yes — the same rule the AI must follow.</p>
+        <p className="tiny muted">Your card is charged only after you confirm. Card numbers are never stored.</p>
       </aside>
     </div>
   )

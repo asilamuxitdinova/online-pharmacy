@@ -541,7 +541,7 @@ var invoiceTmpl = template.Must(template.New("invoice").Funcs(template.FuncMap{
 <style>body{font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;padding:0 16px;color:#222}
 table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 td.n,th.n{text-align:right}.total td{font-weight:600}</style></head><body>
-<h1>Test Pharmacy — invoice</h1>
+<h1>Dorixona — invoice</h1>
 <p>Order <strong>{{.O.ID}}</strong> · status {{.O.Status}} · issued {{.Issued}}</p>
 <p>Customer: {{.Customer}}</p>
 <table><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Total</th></tr></thead><tbody>
@@ -551,7 +551,7 @@ td.n,th.n{text-align:right}.total td{font-weight:600}</style></head><body>
 <tr class="total"><td colspan="3">Total</td><td class="n">{{money .O.Total}}</td></tr>
 {{if .O.Refunded}}<tr><td colspan="3">Refunded</td><td class="n">−{{money .O.Refunded}}</td></tr>{{end}}
 </tbody></table>
-<p><small>All values on this invoice are made up. This pharmacy exists only for testing.</small></p>
+<p><small>Dorixona online pharmacy · Thank you for your order.</small></p>
 </body></html>`))
 
 func (s *Server) invoice(w http.ResponseWriter, r *http.Request, p *principal) error {

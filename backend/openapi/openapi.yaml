@@ -1,26 +1,26 @@
 openapi: 3.1.0
 info:
-  title: Test Pharmacy API
+  title: Dorixona API
   version: 1.0.0
   description: |
-    Customers browse medicines, upload prescriptions, order, pay and ask for refunds.
-    Pharmacists (role `staff`) review prescriptions and refunds over 200 000 UZS.
-    Administrators manage accounts. Every value in this system is made up.
+    The API of Dorixona, an online pharmacy in Uzbekistan. Customers browse medicines,
+    upload prescriptions, order, pay and ask for refunds. Pharmacists (role `staff`)
+    review prescriptions and refunds over 200 000 UZS. Administrators manage accounts.
 
     Amounts are whole Uzbek soʻm (UZS). Times are UTC, RFC 3339.
     Send `Locale: ru` or `Locale: uz` for Russian or Uzbek names and messages.
 
-    Rules an assistant must follow:
+    Rules for any client acting on a customer's behalf:
     - Paying an order moves money: confirm the order id and total with the customer first.
     - Never approve a refund over 200 000 UZS without a pharmacist's decision.
     - Deleting a user cannot be undone.
     Policy pages with the exact rules are under /docs/.
 servers:
   - url: https://pharmacy.example.test
-    description: The one pinned https address. Credentials are only sent here.
+    description: Production
 tags:
   - name: auth
-    description: Sign-in machinery. Used by Frege's sign-in flows, not as tools.
+    description: Sign-in endpoints. Clients call them to obtain credentials, not as regular operations.
   - name: me
     description: The signed-in user's own profile, addresses, cards and API keys.
   - name: catalog
@@ -37,8 +37,8 @@ tags:
     description: Account administration. Need the admin role.
   - name: partner
     description: Wholesale partner endpoints. Signed requests, no user.
-  - name: testing
-    description: Failures and delays on request.
+  - name: diagnostics
+    description: Simulated failures and delays, for testing an integration's error handling.
 
 security:
   - bearerAuth: []
@@ -66,8 +66,8 @@ paths:
               additionalProperties: false
               required: [email, password, name]
               properties:
-                email: {type: string, format: email, example: new.customer@pharmacy.test}
-                password: {type: string, minLength: 8, description: At least 8 characters with a digit and an uppercase letter., example: Secret123!}
+                email: {type: string, format: email, example: new.customer@example.com}
+                password: {type: string, minLength: 8, format: password, description: At least 8 characters with a digit and an uppercase letter.}
                 name: {type: string, minLength: 2, maxLength: 80, example: New Customer}
                 phone: {type: string, pattern: '^\+998\d{9}$', example: '+998901234567'}
       responses:
@@ -115,7 +115,7 @@ paths:
               required: [channel, destination]
               properties:
                 channel: {type: string, enum: [email, sms]}
-                destination: {type: string, description: 'An email for channel email, a +998 phone number for sms.', example: aziza@pharmacy.test}
+                destination: {type: string, description: 'An email for channel email, a +998 phone number for sms.', example: customer@example.com}
       responses:
         '202':
           description: The code was sent (or would have been, if an account exists).
@@ -126,7 +126,7 @@ paths:
                 properties:
                   status: {type: string, const: sent}
                   channel: {type: string}
-                  destination_hint: {type: string, example: 'a****@pharmacy.test'}
+                  destination_hint: {type: string, example: 'n****@example.com'}
                   expires_in: {type: integer, description: Seconds.}
                   resend_after: {type: integer, description: Seconds.}
         '400': {$ref: '#/components/responses/BadRequest'}
@@ -150,7 +150,7 @@ paths:
               additionalProperties: false
               required: [destination, code]
               properties:
-                destination: {type: string, example: aziza@pharmacy.test}
+                destination: {type: string, example: customer@example.com}
                 code: {type: string, pattern: '^\d{6}$', example: '123456'}
       responses:
         '200': {$ref: '#/components/responses/Tokens'}
@@ -257,7 +257,7 @@ paths:
       security: []
       parameters:
         - {name: response_type, in: query, required: true, schema: {type: string, const: code}}
-        - {name: client_id, in: query, required: true, schema: {type: string}, example: frege-test}
+        - {name: client_id, in: query, required: true, schema: {type: string}, example: partner-app}
         - {name: redirect_uri, in: query, required: true, schema: {type: string, format: uri}}
         - {name: code_challenge, in: query, required: true, schema: {type: string}, description: BASE64URL(SHA256(code_verifier)) without padding.}
         - {name: code_challenge_method, in: query, required: true, schema: {type: string, const: S256}}
@@ -971,7 +971,7 @@ paths:
               required: [product_id]
               properties:
                 product_id: {type: string, example: prd_0001}
-                simulate_failure: {type: boolean, default: false, description: 'Make the job fail, for testing.'}
+                simulate_failure: {type: boolean, default: false, description: 'Return a failed job instead of a result (diagnostics).'}
       responses:
         '202': {$ref: '#/components/responses/JobAccepted'}
         '400': {$ref: '#/components/responses/BadRequest'}
@@ -1382,12 +1382,12 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {$ref: '#/components/responses/ValidationFailed'}
 
-  # ---------------------------------------------------------------- testing
+  # ---------------------------------------------------------------- diagnostics
   /_test/fail:
     get:
       operationId: test_fail
-      tags: [testing]
-      summary: Fail on purpose (testing)
+      tags: [diagnostics]
+      summary: Fail on purpose (diagnostics)
       description: Answers the requested error status after an optional delay. flaky_key fails on odd calls and succeeds on the retry. mode=close drops the connection.
       security: []
       parameters:
@@ -1402,8 +1402,8 @@ paths:
   /_test/delay:
     get:
       operationId: test_delay
-      tags: [testing]
-      summary: Wait a number of seconds, then answer (testing)
+      tags: [diagnostics]
+      summary: Wait a number of seconds, then answer (diagnostics)
       security: []
       parameters:
         - {name: seconds, in: query, required: true, schema: {type: number, minimum: 0, maximum: 120}}
@@ -1630,8 +1630,8 @@ components:
       additionalProperties: false
       required: [email, password]
       properties:
-        email: {type: string, format: email, example: aziza@pharmacy.test}
-        password: {type: string, example: Customer123!}
+        email: {type: string, format: email, example: customer@example.com}
+        password: {type: string, format: password}
     TokenRequest:
       type: object
       required: [grant_type]
@@ -1687,7 +1687,7 @@ components:
       additionalProperties: false
       required: [number, exp_month, exp_year, cvc]
       properties:
-        number: {type: string, description: 16 digits. Test cards are listed in /docs/payments., example: '4242424242424242'}
+        number: {type: string, description: 16 digits., example: '8600123456789012'}
         exp_month: {type: integer, minimum: 1, maximum: 12}
         exp_year: {type: integer, example: 2030}
         cvc: {type: string, pattern: '^\d{3,4}$'}

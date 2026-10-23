@@ -38,7 +38,7 @@ export function JobBar({ job, error }: { job: Job | null; error: ApiError | null
   return (
     <div className="stack" style={{ '--gap': '8px' } as React.CSSProperties}>
       <div className="spread small">
-        <span className="mono">{job.id}</span>
+        <span className="muted">{job.status === 'running' ? 'Checking…' : job.status === 'succeeded' ? 'Done' : 'Could not finish'}</span>
         <StatusBadge status={job.status} />
       </div>
       <div style={{ height: 10, borderRadius: 5, background: 'var(--bg-2)', overflow: 'hidden' }}>
@@ -48,7 +48,7 @@ export function JobBar({ job, error }: { job: Job | null; error: ApiError | null
           transition={{ type: 'spring', stiffness: 80, damping: 18 }}
         />
       </div>
-      {job.status === 'running' && <span className="tiny muted">{job.progress}% · about {job.estimated_seconds_left}s left · polling GET /jobs/{'{id}'}</span>}
+      {job.status === 'running' && <span className="tiny muted">{job.progress}% · about {job.estimated_seconds_left}s left</span>}
       {job.error && <div className="error-note">{job.error.message}</div>}
     </div>
   )

@@ -27,4 +27,4 @@
 <tr><td>422</td><td><code>idempotency_key_reused</code></td><td>Use a new <code>Idempotency-Key</code> for a different request.</td></tr>
 <tr><td>429</td><td><code>too_many_attempts</code></td><td>Wait <code>Retry-After</code> seconds before trying again.</td></tr>
 <tr><td>500</td><td><code>internal_error</code></td><td>A bug on our side. Report the <code>request_id</code>.</td></tr>
-<tr><td>503</td><td><code>simulated_failure</code></td><td>Only from <code>/_test/fail</code>. Retry after <code>Retry-After</code>.</td></tr></table>
+<tr><td>503</td><td><code>simulated_failure</code></td><td>Only from the diagnostics endpoint, on request. Retry after <code>Retry-After</code>.</td></tr></table>

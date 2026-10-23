@@ -36,9 +36,8 @@ export default function Admin() {
     <Page>
       <div className="stack" style={{ '--gap': '24px' } as React.CSSProperties}>
         <div className="stack" style={{ '--gap': '6px' } as React.CSSProperties}>
-          <span className="kicker">role: admin · consequential tools</span>
           <h1 style={{ fontSize: 'clamp(36px, 5vw, 60px)' }}>{t('nav.admin')}</h1>
-          <p className="muted small">Role changes apply on the user's very next request — no new sign-in needed. Try it with a second browser.</p>
+          <p className="muted small">Changes to roles and access apply immediately.</p>
         </div>
         <div className="row">
           <input className="input" style={{ maxWidth: 300 }} placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />

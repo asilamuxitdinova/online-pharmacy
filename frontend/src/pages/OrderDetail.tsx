@@ -33,7 +33,7 @@ export default function OrderDetail() {
   if (order.error?.status === 404) {
     return (
       <Page>
-        <Empty title="No such order" hint="It does not exist, or it belongs to someone else — the API answers 404 either way." art={<PillIcon form="sachets" a="var(--line-2)" b="var(--bg-2)" size={100} />} />
+        <Empty title="No such order" hint="We could not find this order in your account." art={<PillIcon form="sachets" a="var(--line-2)" b="var(--bg-2)" size={100} />} />
       </Page>
     )
   }
@@ -139,12 +139,12 @@ export default function OrderDetail() {
             {o.status === 'pending_payment' && (
               <>
                 <button className="btn coral" onClick={() => setPaying(true)}>{t('order.payNow')}</button>
-                <DeliverySwitch order={o} onChange={(next) => act(() => patch(`/orders/${o.id}`, next), 'Delivery updated (PATCH)')} />
+                <DeliverySwitch order={o} onChange={(next) => act(() => patch(`/orders/${o.id}`, next), 'Delivery updated')} />
                 <button className="btn ghost" onClick={() => setConfirmCancel(true)}>{t('order.cancel')}</button>
               </>
             )}
             {(o.status === 'pending_payment' || o.status === 'cancelled') && (
-              <button className="btn ghost" onClick={() => act(async () => { await del(`/orders/${o.id}`); nav('/account') }, 'Order deleted (204)')}>
+              <button className="btn ghost" onClick={() => act(async () => { await del(`/orders/${o.id}`); nav('/account') }, 'Order deleted')}>
                 {t('common.delete')}
               </button>
             )}
@@ -158,7 +158,7 @@ export default function OrderDetail() {
                 }
               }}
             >
-              🧾 {t('order.invoice')} <span className="tiny muted">(text/html)</span>
+              🧾 {t('order.invoice')}
             </button>
             <ErrorNote error={actionError} />
           </div>
@@ -212,7 +212,6 @@ function DeliverySwitch({ order, onChange }: { order: Order; onChange: (b: Recor
       className="btn ghost"
       disabled={next === 'courier' && !first}
       onClick={() => onChange(next === 'pickup' ? { delivery: 'pickup' } : { delivery: 'courier', address_id: first! })}
-      title="PATCH /orders/{id} changes only the fields sent"
     >
       Switch to {next}
     </button>

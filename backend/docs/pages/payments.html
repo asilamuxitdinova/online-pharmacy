@@ -8,14 +8,3 @@
 </ul>
 <h2>Accepted cards</h2>
 <p>Visa, Mastercard, Uzcard and Humo, 16 digits.</p>
-<h2>Test cards</h2>
-<p>Any 16-digit number that passes the checksum is approved, except these. Use any future expiry and any 3-digit CVC.</p>
-<table><tr><th>Number</th><th>Brand</th><th>Result</th></tr>
-<tr><td><code>4242 4242 4242 4242</code></td><td>Visa</td><td>Approved</td></tr>
-<tr><td><code>5555 5555 5555 4444</code></td><td>Mastercard</td><td>Approved</td></tr>
-<tr><td><code>8600 0000 0000 0007</code></td><td>Uzcard</td><td>Approved</td></tr>
-<tr><td><code>9860 0000 0000 0000</code></td><td>Humo</td><td>Approved</td></tr>
-<tr><td><code>4000 0000 0000 0002</code></td><td>Visa</td><td>Declined (<code>card_declined</code>)</td></tr>
-<tr><td><code>4000 0000 0000 9995</code></td><td>Visa</td><td>Insufficient funds</td></tr>
-<tr><td><code>8600 0000 0000 0999</code></td><td>Uzcard</td><td>Declined</td></tr>
-<tr><td><code>9860 0000 0000 0992</code></td><td>Humo</td><td>Insufficient funds</td></tr></table>

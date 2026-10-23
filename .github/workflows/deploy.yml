@@ -6,8 +6,7 @@ name: Deploy
 #   secrets  DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS
 #   vars     DEPLOY_PORT (default 22), HEALTH_URL (default http://127.0.0.1:8090/health),
 #            PUBLIC_SITE (default https://pharmacy.sukoon.uz)
-# Optional repository variable VITE_OAUTH_CLIENT_SECRET (it ends up in public
-# JavaScript, so it is a variable, not a secret). See deploy/README.md.
+# See deploy/README.md.
 
 on:
   push:
@@ -56,8 +55,6 @@ jobs:
 
       - name: Frontend
         run: make -C frontend build
-        env:
-          VITE_OAUTH_CLIENT_SECRET: ${{ vars.VITE_OAUTH_CLIENT_SECRET }}
 
       - name: Package
         run: |

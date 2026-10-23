@@ -127,10 +127,23 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/", notFoundHandler)
 }
 
-// serveSpec fills in the one https server address from PUBLIC_URL.
+// serveSpec fills in the one https server address from PUBLIC_URL. The
+// public copy leaves out the marks that tell one particular client which
+// operations are sign-in endpoints; the spec handed to that client keeps them.
 func (s *Server) serveSpec(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
-	_, _ = w.Write([]byte(strings.ReplaceAll(openapi.Spec, openapi.ServerPlaceholder, s.cfg.PublicURL)))
+	_, _ = w.Write([]byte(PublicSpec(s.cfg.PublicURL)))
+}
+
+func PublicSpec(publicURL string) string {
+	var b strings.Builder
+	for _, line := range strings.SplitAfter(openapi.Spec, "\n") {
+		if strings.TrimSpace(line) == "x-frege-auth-op: true" {
+			continue
+		}
+		b.WriteString(line)
+	}
+	return strings.ReplaceAll(b.String(), openapi.ServerPlaceholder, publicURL)
 }
 
 func serveDocs(w http.ResponseWriter, r *http.Request) {

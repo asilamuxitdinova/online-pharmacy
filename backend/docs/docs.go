@@ -1,8 +1,7 @@
 // Package docs holds the policy and help pages served under /docs/.
 //
-// They are written as real policy text with real numbers, so a docs search
-// (and an eval) can ask "how much can be refunded without a pharmacist?" and
-// get an answer that contains 200 000.
+// They are written as policy text with real numbers, so a search can ask
+// "how much can be refunded without a pharmacist?" and get 200 000.
 package docs
 
 import (
@@ -17,11 +16,11 @@ import (
 var pages embed.FS
 
 // Order is the navigation order; titles come from each page's <h1>.
-var Order = []string{"index", "authentication", "roles", "ordering", "payments", "refunds", "delivery", "prescriptions", "errors", "testing", "faq"}
+var Order = []string{"index", "authentication", "roles", "ordering", "payments", "refunds", "delivery", "prescriptions", "errors", "faq"}
 
 var layout = template.Must(template.New("layout").Parse(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{.Title}} · Test Pharmacy docs</title>
+<title>{{.Title}} · Dorixona</title>
 <style>
 :root{--bg:#fbfcfc;--text:#1d2329;--muted:#5d6872;--line:#e2e6ea;--accent:#0b7a5a;--code:#f0f3f5}
 @media (prefers-color-scheme:dark){:root{--bg:#14171a;--text:#e6e9ec;--muted:#98a2ad;--line:#2c3338;--accent:#3ccf9a;--code:#1f2429}}

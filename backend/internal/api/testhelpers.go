@@ -86,7 +86,7 @@ func (s *Server) inbox(w http.ResponseWriter, r *http.Request, _ *principal) err
 
 var inboxPage = template.Must(template.New("inbox").Parse(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="5"><title>Demo inbox · Test Pharmacy</title>
+<meta http-equiv="refresh" content="5"><title>Outgoing messages · Dorixona</title>
 <style>
 :root{--bg:#f6f7f9;--card:#fff;--text:#1d2329;--muted:#66707a;--line:#e2e6ea;--ok:#0b7a5a;--bad:#b42318;--code:#eef6f2}
 @media (prefers-color-scheme:dark){:root{--bg:#14171a;--card:#1d2226;--text:#e6e9ec;--muted:#98a2ad;--line:#2c3338;--ok:#3ccf9a;--bad:#ff8a80;--code:#1f3a30}}
@@ -99,7 +99,7 @@ main{max-width:860px;margin:0 auto}h1{font-size:22px;margin:0 0 4px}p.sub{color:
 .code{font-family:ui-monospace,monospace;font-size:26px;letter-spacing:.2em;background:var(--code);padding:4px 10px;border-radius:6px;display:inline-block;margin-top:6px}
 .ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
 </style></head><body><main>
-<h1>Demo inbox</h1>
+<h1>Outgoing messages</h1>
 <p class="sub">One-time codes, notices and webhook deliveries that would otherwise go to email, SMS or a server. Refreshes every 5 seconds.</p>
 {{range .}}<div class="msg"><div class="top"><span class="kind">{{.Kind}}</span><span>to {{.Recipient}}</span><span>{{.CreatedAt}}</span>
 {{with .Meta.verified}}<span class="ok">signature verified</span>{{end}}{{with .Meta.failure}}<span class="bad">{{.}}</span>{{end}}</div>
@@ -332,7 +332,8 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request, _ *principal) er
 	return nil
 }
 
-// testConfig shows the settings a tester needs to know, never the secrets.
+// testConfig shows the non-secret settings. Accounts and passwords are never
+// listed here: the site is public.
 func (s *Server) testConfig(w http.ResponseWriter, r *http.Request, _ *principal) error {
 	c := s.cfg
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -342,16 +343,6 @@ func (s *Server) testConfig(w http.ResponseWriter, r *http.Request, _ *principal
 		"oauth_client_id": c.OAuthClientID, "oauth_redirect_uris": c.OAuthRedirectURIs, "partner_client_id": c.PartnerClientID,
 		"auto_refund_limit": c.AutoRefundLimit, "free_delivery_threshold": c.FreeDeliveryThreshold, "delivery_fee": c.DeliveryFee,
 		"job_duration_seconds": c.JobDuration.Seconds(), "webhook_url_set": c.WebhookURL != "", "reset_needs_token": c.TestResetToken != "",
-		"seed_accounts": seedAccounts(),
 	})
 	return nil
-}
-
-func seedAccounts() []map[string]any {
-	var out []map[string]any
-	for _, u := range store.SeedUsers {
-		out = append(out, map[string]any{"id": u.ID, "email": u.Email, "phone": u.Phone, "password": u.Password, "role": u.Role,
-			"disabled": u.Disabled, "api_key": u.APIKey})
-	}
-	return out
 }

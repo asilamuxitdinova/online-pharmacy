@@ -59,7 +59,6 @@ export default function Shop() {
     <Page>
       <div className="stack" style={{ '--gap': '22px' } as React.CSSProperties}>
         <div className="stack" style={{ '--gap': '6px' } as React.CSSProperties}>
-          <span className="kicker">GET /products</span>
           <h1 style={{ fontSize: 'clamp(36px, 5vw, 60px)' }}>{t('nav.shop')}</h1>
         </div>
 
@@ -163,9 +162,6 @@ function Pager({ page, pages, onPage }: { page: number; pages: number; onPage: (
       <button className="btn ghost sm" disabled={page >= pages} onClick={() => onPage(page + 1)}>
         →
       </button>
-      <span className="tiny muted mono" style={{ width: '100%', textAlign: 'center' }}>
-        ?page={page}&amp;page_size=24
-      </span>
     </nav>
   )
 }

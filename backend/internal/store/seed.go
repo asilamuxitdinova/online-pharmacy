@@ -22,9 +22,9 @@ type SeedUser struct {
 var SeedUsers = []SeedUser{
 	{ID: "usr_aziza", Email: "aziza@pharmacy.test", Phone: "+998900000001", Name: "Aziza Karimova", Password: "Customer123!", Role: "customer", TIN: "301234567", APIKey: "phk_test_customer_aziza_0000000000000001"},
 	{ID: "usr_bekzod", Email: "bekzod@pharmacy.test", Phone: "+998900000002", Name: "Bekzod Rahimov", Password: "Customer123!", Role: "customer", TIN: "302345678", APIKey: "phk_test_customer_bekzod_000000000000002"},
-	{ID: "usr_dilnoza", Email: "dilnoza@pharmacy.test", Phone: "+998900000003", Name: "Dilnoza Yusupova (pharmacist)", Password: "Staff123!", Role: "staff", TIN: "303456789", APIKey: "phk_test_staff_dilnoza_00000000000000003"},
+	{ID: "usr_dilnoza", Email: "dilnoza@pharmacy.test", Phone: "+998900000003", Name: "Dilnoza Yusupova", Password: "Staff123!", Role: "staff", TIN: "303456789", APIKey: "phk_test_staff_dilnoza_00000000000000003"},
 	{ID: "usr_admin", Email: "admin@pharmacy.test", Phone: "+998900000004", Name: "Admin", Password: "Admin123!", Role: "admin", TIN: "304567890", APIKey: "phk_test_admin_000000000000000000000004"},
-	{ID: "usr_timur", Email: "timur@pharmacy.test", Phone: "+998900000005", Name: "Timur Disabled", Password: "Customer123!", Role: "customer", TIN: "305678901", Disabled: true},
+	{ID: "usr_timur", Email: "timur@pharmacy.test", Phone: "+998900000005", Name: "Timur Saidov", Password: "Customer123!", Role: "customer", TIN: "305678901", Disabled: true},
 }
 
 var (
@@ -244,7 +244,7 @@ func seed(ctx context.Context, tx *sql.Tx, now int64) error {
 		}
 		if u.APIKey != "" {
 			if err := exec(`INSERT INTO api_keys (id, user_id, name, prefix, key_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-				"key_"+strings.TrimPrefix(u.ID, "usr_"), u.ID, "Seeded demo key", u.APIKey[:12], Hash(u.APIKey), now); err != nil {
+				"key_"+strings.TrimPrefix(u.ID, "usr_"), u.ID, "Mobile app", u.APIKey[:12], Hash(u.APIKey), now); err != nil {
 				return err
 			}
 		}
@@ -281,9 +281,9 @@ func seed(ctx context.Context, tx *sql.Tx, now int64) error {
 			[]any{"adr_bekzod_home", "usr_bekzod", "Home", "7 Registan avenue", "Samarkand", "+998900000002", now}},
 
 		{`INSERT INTO prescriptions (id, user_id, doctor_name, clinic, issued_on, diagnosis, status, reviewed_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			[]any{"rx_aziza_approved", "usr_aziza", "Dr. Example One", "City Clinic No. 0", "2026-10-01", "Acute bronchitis (made-up)", "approved", "usr_dilnoza", now - 86400*7}},
+			[]any{"rx_aziza_approved", "usr_aziza", "Dr. Malika Rashidova", "City Polyclinic No. 12", "2026-10-01", "Acute bronchitis", "approved", "usr_dilnoza", now - 86400*7}},
 		{`INSERT INTO prescriptions (id, user_id, doctor_name, clinic, issued_on, diagnosis, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			[]any{"rx_aziza_pending", "usr_aziza", "Dr. Example Two", "Family Clinic No. 0", "2026-10-20", "Hypertension follow-up (made-up)", "pending_review", now - 3600}},
+			[]any{"rx_aziza_pending", "usr_aziza", "Dr. Jasur Tursunov", "Family Clinic No. 4", "2026-10-20", "Hypertension follow-up", "pending_review", now - 3600}},
 
 		{`INSERT INTO cards (id, user_id, brand, last4, exp_month, exp_year, outcome, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			[]any{"card_aziza_visa", "usr_aziza", "visa", "4242", 12, 2030, "approved", now}},

@@ -5,9 +5,9 @@
 <p>After <strong>5 wrong passwords</strong> the account is locked for <strong>5 minutes</strong>. A locked sign-in answers <code>429 too_many_attempts</code> with a <code>Retry-After</code> header in seconds.</p>
 <p><code>POST /auth/register</code> creates a customer account and signs it in. Passwords need at least 8 characters, a digit and an uppercase letter.</p>
 <h2>One-time codes</h2>
-<p><code>POST /auth/otp/request</code> with <code>{"channel": "email" | "sms", "destination"}</code> sends a 6-digit code that lives for 5 minutes. A new code can be requested every 30 seconds. <code>POST /auth/otp/verify</code> with <code>{"destination", "code"}</code> signs in. Five wrong codes kill the code. In this test system codes are delivered to the <a href="/docs/testing">demo inbox</a>.</p>
+<p><code>POST /auth/otp/request</code> with <code>{"channel": "email" | "sms", "destination"}</code> sends a 6-digit code that lives for 5 minutes. A new code can be requested every 30 seconds. <code>POST /auth/otp/verify</code> with <code>{"destination", "code"}</code> signs in. Five wrong codes kill the code.</p>
 <h2>Renewing access</h2>
-<p>Access tokens live 15 minutes by default (a tester can set this to 60 seconds). <code>POST /auth/refresh</code> with <code>{"refresh_token"}</code> returns a <strong>new</strong> access token and a <strong>new</strong> refresh token. The old refresh token stops working at once.</p>
+<p>Access tokens live 15 minutes. <code>POST /auth/refresh</code> with <code>{"refresh_token"}</code> returns a <strong>new</strong> access token and a <strong>new</strong> refresh token. The old refresh token stops working at once.</p>
 <p class="note">Presenting a refresh token that was already used is treated as theft: the whole sign-in ends and every token from it stops working (<code>401 refresh_reused</code>). The user must sign in again.</p>
 <h2>Signing out</h2>
 <p><code>POST /auth/logout</code> ends the current sign-in. <code>{"all_sessions": true}</code> ends every sign-in of the user. Ended tokens are refused on the very next request with <code>401 session_ended</code>.</p>
@@ -27,7 +27,7 @@
 <h2>Signed requests (partners)</h2>
 <p>The <code>/partner/*</code> endpoints are for wholesale partners and take no user credential. Each request carries:</p>
 <table><tr><th>Header</th><th>Value</th></tr>
-<tr><td><code>X-Client-Id</code></td><td>The partner id, for example <code>partner-demo</code>.</td></tr>
+<tr><td><code>X-Client-Id</code></td><td>The partner id Dorixona issued to you.</td></tr>
 <tr><td><code>X-Timestamp</code></td><td>Current time in unix seconds. Must be within 5 minutes of the server clock.</td></tr>
 <tr><td><code>X-Signature</code></td><td>Hex HMAC-SHA256, keyed with the partner secret, of the string below.</td></tr></table>
 <pre><code>&lt;X-Timestamp&gt; + "\n" + &lt;METHOD&gt; + "\n" + &lt;path with query&gt; + "\n" + hex(sha256(body))</code></pre>

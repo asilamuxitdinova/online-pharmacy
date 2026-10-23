@@ -1,13 +1,5 @@
 import { motion } from 'motion/react'
 
-export const TEST_CARDS = [
-  { number: '4242 4242 4242 4242', label: 'Visa · approves', tone: 'ok' },
-  { number: '8600 0000 0000 0007', label: 'Uzcard · approves', tone: 'ok' },
-  { number: '9860 0000 0000 0000', label: 'Humo · approves', tone: 'ok' },
-  { number: '4000 0000 0000 0002', label: 'Visa · declines', tone: 'bad' },
-  { number: '4000 0000 0000 9995', label: 'Visa · no funds', tone: 'bad' },
-] as const
-
 export function brandOf(num: string) {
   const n = num.replace(/\D/g, '')
   if (n.startsWith('4')) return 'visa'
@@ -71,7 +63,7 @@ export function PaymentCard({ number, name, exp, cvc, flipped }: { number: strin
           <div style={{ margin: '18px 22px', background: '#fff', color: '#111', borderRadius: 6, padding: '8px 12px', textAlign: 'right' }} className="mono">
             {cvc.replace(/./g, '•') || 'CVC'}
           </div>
-          <p style={{ margin: '0 22px', fontSize: 11, opacity: 0.8 }}>Test card. The number is checked, then forgotten: only the brand and last four digits are kept.</p>
+          <p style={{ margin: '0 22px', fontSize: 11, opacity: 0.8 }}>Your card number is checked, then forgotten: we keep only the brand and the last four digits.</p>
         </div>
       </motion.div>
     </div>
